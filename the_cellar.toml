@@ -1,25 +1,27 @@
-# --- Rooms ---
-[rooms.0]
-description = "You are in a dusty cellar. It's dark and smells of old wood. A single wooden door is to the north. It looks locked."
-choices = [0, 1, 2, 3]
+starting_room_id = "cellar"
 
-[rooms.1]
+# --- Rooms ---
+[rooms."cellar"]
+description = "You are in a dusty cellar. It's dark and smells of old wood. A single wooden door is to the north. It looks locked."
+choices = ["try_door", "look_around", "unlock_door", "go_north"]
+
+[rooms."hallway"]
 description = "You are in a long, narrow hallway. The cellar door is to the south."
-choices = [10]
+choices = ["go_south"]
 
 # --- Choices ---
-[choices.0]
+[choices."try_door"]
 text = "Try to open the north door."
 actions = [{ DisplayText = "The door is locked. It won't budge." }]
 
-[choices.1]
+[choices."look_around"]
 text = "Look around in the dust."
 actions = [
     { DisplayText = "You rummage through some old crates and find a rusty key!" },
     { SetFlag = "has_key" },
 ]
 
-[choices.2]
+[choices."unlock_door"]
 text = "Unlock the north door with the rusty key."
 condition = { HasFlag = "has_key" }
 actions = [
@@ -27,11 +29,11 @@ actions = [
     { SetFlag = "door_unlocked" },
 ]
 
-[choices.3]
+[choices."go_north"]
 text = "Go north through the unlocked door."
 condition = { HasFlag = "door_unlocked" }
-actions = [{ GoTo = 1 }]
+actions = [{ GoTo = "hallway" }]
 
-[choices.10]
+[choices."go_south"]
 text = "Go south back to the cellar."
-actions = [{ GoTo = 0 }]
+actions = [{ GoTo = "cellar" }]

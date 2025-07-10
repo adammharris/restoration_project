@@ -1,13 +1,15 @@
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
-use std::io;
+use std::io::{self, Write};
+use std::thread;
+use std::time::Duration;
 
 // --- ID Types for Type Safety ---
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
-pub struct RoomId(pub u32);
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]
+pub struct RoomId(pub String);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
-pub struct ChoiceId(pub u32);
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]
+pub struct ChoiceId(pub String);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]
 pub struct FlagId(pub String);
@@ -15,14 +17,15 @@ pub struct FlagId(pub String);
 // --- Static World Data ---
 #[derive(Debug, Deserialize)]
 pub struct World {
-    pub rooms: HashMap<RoomId, Room>,
-    pub choices: HashMap<ChoiceId, Choice>,
+    pub rooms: HashMap<String, Room>,
+    pub choices: HashMap<String, Choice>,
+    pub starting_room_id: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Room {
     pub description: String,
-    pub choices: Vec<ChoiceId>,
+    pub choices: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -39,7 +42,7 @@ pub enum Condition {
 
 #[derive(Debug, Deserialize)]
 pub enum Action {
-    GoTo(RoomId),
+    GoTo(String),
     SetFlag(FlagId),
     Quit,
     DisplayText(String),
@@ -47,13 +50,13 @@ pub enum Action {
 
 // --- Dynamic Game State ---
 pub struct GameState {
-    pub current_room_id: RoomId,
+    pub current_room_id: String,
     pub flags: HashSet<FlagId>,
     pub has_quit: bool,
 }
 
 impl GameState {
-    pub fn new(starting_room_id: RoomId) -> Self {
+    pub fn new(starting_room_id: String) -> Self {
         GameState {
             current_room_id: starting_room_id,
             flags: HashSet::new(),
@@ -68,6 +71,7 @@ impl GameState {
 pub struct TomlWorld {
     pub rooms: HashMap<String, Room>,
     pub choices: HashMap<String, Choice>,
+    pub starting_room_id: String,
 }
 
 fn load_world_from_toml(path: &str) -> Result<World, Box<dyn std::error::Error>> {
@@ -76,15 +80,15 @@ fn load_world_from_toml(path: &str) -> Result<World, Box<dyn std::error::Error>>
 
     let mut rooms = HashMap::new();
     for (key, value) in toml_world.rooms {
-        rooms.insert(RoomId(key.parse()?), value);
+        rooms.insert(key, value);
     }
 
     let mut choices = HashMap::new();
     for (key, value) in toml_world.choices {
-        choices.insert(ChoiceId(key.parse()?), value);
+        choices.insert(key, value);
     }
 
-    Ok(World { rooms, choices })
+    Ok(World { rooms, choices, starting_room_id: toml_world.starting_room_id })
 }
 
 use std::env;
@@ -100,8 +104,8 @@ fn main() {
             return;
         }
     };
-    let mut game_state = GameState::new(RoomId(0));
-    let mut last_room_id = game_state.current_room_id; // Track the last room
+    let mut game_state = GameState::new(world.starting_room_id.clone());
+    let mut last_room_id = game_state.current_room_id.clone(); // Track the last room
 
     println!("--- Welcome to the Restoration Project ---");
 
@@ -120,7 +124,7 @@ fn main() {
                 .get(&game_state.current_room_id)
                 .expect("Room not found!");
             println!("\n{}", current_room.description);
-            last_room_id = game_state.current_room_id;
+            last_room_id = game_state.current_room_id.clone();
         }
 
         let current_room = world
@@ -182,12 +186,20 @@ fn check_condition(choice: &Choice, game_state: &GameState) -> bool {
 fn execute_actions(choice: &Choice, game_state: &mut GameState) {
     for action in &choice.actions {
         match action {
-            Action::GoTo(room_id) => game_state.current_room_id = *room_id,
+            Action::GoTo(room_id) => game_state.current_room_id = room_id.clone(),
             Action::SetFlag(flag_id) => {
                 game_state.flags.insert(flag_id.clone());
             }
             Action::Quit => game_state.has_quit = true,
-            Action::DisplayText(text) => println!("\n{}", text),
+            Action::DisplayText(text) => {
+                print!("\n");
+                for c in text.chars() {
+                    print!("{}", c);
+                    io::stdout().flush().unwrap();
+                    thread::sleep(Duration::from_millis(30)); // Adjust delay as needed
+                }
+                println!();
+            },
         }
     }
 }

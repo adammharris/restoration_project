@@ -1,3 +1,5 @@
+starting_room_id = "cubicle"
+
 # Welcome to the Story Template!
 # This file explains how to create your own text adventure story using TOML.
 # The game world is defined by two main things: Rooms and Choices.
@@ -7,39 +9,38 @@
 # Each room needs a unique ID, a description, and a list of choices.
 # The `[rooms]` table holds all the rooms in your story.
 
-# To define a room, create a section like `[rooms."0"]`.
-# The number in quotes is the Room's ID. It must be a unique integer.
-# We use quotes because TOML requires keys in this format to be strings.
-[rooms."0"]
+# To define a room, create a section like `[rooms.new_room]`
+# The name of the room must be unique.
+[rooms.cubicle]
 # The `description` is the text shown to the player when they enter the room.
 description = "You are in a small, windowless office cubicle. Your computer screen glows softly. There's a door to the hallway to the north."
 # `choices` is a list of Choice IDs available in this room.
 # These IDs must match the choices you define later.
 choices = [
-    0,
-    1,
-    2,
-    3,
-    5,
-] # Look at computer, open drawer, log into computer, go to hallway
+    "look_computer",
+    "open_drawer",
+    "check_plant",
+    "log_in_computer",
+    "go_hallway",
+]
 
-[rooms."1"]
+[rooms.hallway]
 description = "You are in a sterile-looking office hallway. The exit is to the north, and your cubicle is to the south."
-choices = [10, 11, 12]                                                                                                   # Try exit, use keycard, go back to cubicle
+choices = ["try_exit", "use_keycard", "go_cubicle"]
 
-[rooms."2"]
+[rooms.outside]
 description = "You've made it outside! The city air feels fresh. You are free."
-choices = [20, 21]                                                              # Celebrate, go home
+choices = ["celebrate", "go_home"]
 
 
 # --- 2. Choices ---
 # Choices are the actions the player can take.
-# Each choice needs a unique ID, the text to display, and a list of actions to perform.
+# Each choice needs a unique name, the text to display, and a list of actions to perform.
 # The `[choices]` table holds all the choices.
 
-# To define a choice, create a section like `[choices."0"]`.
-# The number in quotes is the Choice's ID. It must be a unique integer.
-[choices."0"]
+# To define a choice, create a section like `[choices.look_computer]`.
+# The name of the choice must be unique.
+[choices.look_computer]
 # `text` is what the player sees in the list of options.
 text = "Look at the computer screen."
 # `actions` is a list of things that happen when the player picks this choice.
@@ -52,7 +53,7 @@ actions = [
     { DisplayText = "The screen shows a login prompt. You'll need a password." },
 ]
 
-[choices."1"]
+[choices.open_drawer]
 text = "Open the desk drawer."
 actions = [
     { DisplayText = "You find a sticky note inside. It reads: 'password123'" },
@@ -61,7 +62,7 @@ actions = [
     { SetFlag = "has_password" },
 ]
 
-[choices."2"]
+[choices.check_plant]
 text = "Check the sad-looking office plant."
 # This choice has a `condition`. It will only be shown to the player
 # if the condition is met.
@@ -72,7 +73,7 @@ actions = [
     { SetFlag = "has_keycard" },
 ]
 
-[choices."3"]
+[choices.log_in_computer]
 text = "Log into the computer."
 condition = { HasFlag = "has_password" }
 actions = [
@@ -80,32 +81,32 @@ actions = [
     { SetFlag = "knows_about_keycard" },
 ]
 
-[choices."5"]
+[choices.go_hallway]
 text = "Go north to the hallway."
-actions = [{ GoTo = 1 }]          # This moves the player to Room 1.
+actions = [{ GoTo = "hallway" }]  # This moves the player to Room 1.
 
-[choices."10"]
+[choices.try_exit]
 text = "Try to open the exit door."
 actions = [
     { DisplayText = "It's locked. A card reader is blinking next to it." },
 ]
 
-[choices."11"]
+[choices.use_keycard]
 text = "Use the keycard on the exit door."
 condition = { HasFlag = "has_keycard" }
 actions = [
     { DisplayText = "The card reader beeps and the lock clicks open." },
-    { GoTo = 2 },                                                        # Move to Room 2 (Outside)
+    { GoTo = "outside" },                                                # Move to Room 2 (Outside)
 ]
 
-[choices."12"]
+[choices.go_cubicle]
 text = "Go south back to your cubicle."
-actions = [{ GoTo = 0 }]
+actions = [{ GoTo = "cubicle" }]
 
-[choices."20"]
+[choices.celebrate]
 text = "Celebrate your escape."
 actions = [{ DisplayText = "You do a little dance. You've earned it." }]
 
-[choices."21"]
+[choices.go_home]
 text = "Go home."
 actions = ["Quit"] # This ends the game.
