@@ -1,0 +1,37 @@
+# --- Rooms ---
+[rooms.0]
+description = "You are in a dusty cellar. It's dark and smells of old wood. A single wooden door is to the north. It looks locked."
+choices = [0, 1, 2, 3]
+
+[rooms.1]
+description = "You are in a long, narrow hallway. The cellar door is to the south."
+choices = [10]
+
+# --- Choices ---
+[choices.0]
+text = "Try to open the north door."
+actions = [{ DisplayText = "The door is locked. It won't budge." }]
+
+[choices.1]
+text = "Look around in the dust."
+actions = [
+    { DisplayText = "You rummage through some old crates and find a rusty key!" },
+    { SetFlag = "has_key" },
+]
+
+[choices.2]
+text = "Unlock the north door with the rusty key."
+condition = { HasFlag = "has_key" }
+actions = [
+    { DisplayText = "The key fits! You turn the lock with a loud *click*." },
+    { SetFlag = "door_unlocked" },
+]
+
+[choices.3]
+text = "Go north through the unlocked door."
+condition = { HasFlag = "door_unlocked" }
+actions = [{ GoTo = 1 }]
+
+[choices.10]
+text = "Go south back to the cellar."
+actions = [{ GoTo = 0 }]
