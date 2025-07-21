@@ -1,0 +1,4 @@
+typewriter_speed_ms = 10
+enable_typewriter = false
+allow_text_commands = true
+auto_save = false
