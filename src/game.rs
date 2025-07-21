@@ -66,6 +66,12 @@ fn check_single_condition(condition: &Condition, game_state: &GameState) -> bool
         Condition::CounterEquals(counter, value) => {
             game_state.counters.get(counter).unwrap_or(&0) == value
         }
+        Condition::And(left, right) => {
+            check_single_condition(left, game_state) && check_single_condition(right, game_state)
+        }
+        Condition::Or(left, right) => {
+            check_single_condition(left, game_state) || check_single_condition(right, game_state)
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-use restoration_project::world::{load_world_from_markdown, World};
+use restoration_project::world::{load_world_from_markdown, World, Condition};
 use restoration_project::errors::GameError;
 use std::env;
 use std::collections::HashSet;
@@ -89,6 +89,14 @@ fn analyze_story(world: &World) -> Result<StoryStats, GameError> {
                 restoration_project::world::Condition::CounterLessThan(_, _) |
                 restoration_project::world::Condition::CounterEquals(_, _) => {
                     // Counters don't use flags
+                }
+                restoration_project::world::Condition::And(left, right) => {
+                    collect_flags_from_condition(left, &mut flags);
+                    collect_flags_from_condition(right, &mut flags);
+                }
+                restoration_project::world::Condition::Or(left, right) => {
+                    collect_flags_from_condition(left, &mut flags);
+                    collect_flags_from_condition(right, &mut flags);
                 }
             }
         }
@@ -232,6 +240,40 @@ fn calculate_max_depth(world: &World) -> usize {
     }
     
     dfs(world, &world.starting_room_id, &mut HashSet::new(), 0)
+}
+
+fn collect_flags_from_condition(condition: &Condition, flags: &mut HashSet<String>) {
+    match condition {
+        Condition::HasFlag(flag) => {
+            flags.insert(flag.0.clone());
+        }
+        Condition::NotHasFlag(flag) => {
+            flags.insert(flag.0.clone());
+        }
+        Condition::HasAllFlags(flag_list) => {
+            for flag in flag_list {
+                flags.insert(flag.0.clone());
+            }
+        }
+        Condition::HasAnyFlags(flag_list) => {
+            for flag in flag_list {
+                flags.insert(flag.0.clone());
+            }
+        }
+        Condition::CounterGreaterThan(_, _) |
+        Condition::CounterLessThan(_, _) |
+        Condition::CounterEquals(_, _) => {
+            // Counters don't use flags
+        }
+        Condition::And(left, right) => {
+            collect_flags_from_condition(left, flags);
+            collect_flags_from_condition(right, flags);
+        }
+        Condition::Or(left, right) => {
+            collect_flags_from_condition(left, flags);
+            collect_flags_from_condition(right, flags);
+        }
+    }
 }
 
 fn print_story_stats(stats: &StoryStats) {

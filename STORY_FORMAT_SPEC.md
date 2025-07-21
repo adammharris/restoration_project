@@ -60,7 +60,7 @@ You are in a dusty cellar. It's dark and smells of old wood.
 ### Display Text
 ```markdown
 - "Text to display to the player"
-	say: Alternative syntax for display text
+- say: Alternative syntax for display text
 ```
 
 ### Movement

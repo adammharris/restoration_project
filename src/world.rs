@@ -42,6 +42,8 @@ pub enum Condition {
     CounterGreaterThan(String, i32),
     CounterLessThan(String, i32),
     CounterEquals(String, i32),
+    And(Box<Condition>, Box<Condition>),
+    Or(Box<Condition>, Box<Condition>),
 }
 
 #[derive(Debug, Deserialize)]

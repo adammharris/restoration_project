@@ -256,6 +256,36 @@ fn parse_action(action_str: &str) -> GameResult<Action> {
 fn parse_condition(condition_str: &str) -> GameResult<Condition> {
     let condition_str = condition_str.trim();
     
+    // Check for logical AND (&)
+    if let Some(pos) = condition_str.find(" & ") {
+        let left = condition_str[..pos].trim();
+        let right = condition_str[pos + 3..].trim();
+        
+        let left_condition = parse_single_condition(left)?;
+        let right_condition = parse_single_condition(right)?;
+        
+        return Ok(Condition::And(Box::new(left_condition), Box::new(right_condition)));
+    }
+    
+    // Check for logical OR (|)
+    if let Some(pos) = condition_str.find(" | ") {
+        let left = condition_str[..pos].trim();
+        let right = condition_str[pos + 3..].trim();
+        
+        let left_condition = parse_single_condition(left)?;
+        let right_condition = parse_single_condition(right)?;
+        
+        return Ok(Condition::Or(Box::new(left_condition), Box::new(right_condition)));
+    }
+    
+    // Single condition
+    parse_single_condition(condition_str)
+}
+
+
+fn parse_single_condition(condition_str: &str) -> GameResult<Condition> {
+    let condition_str = condition_str.trim();
+    
     // Simple flag conditions
     if condition_str.starts_with('!') {
         return Ok(Condition::NotHasFlag(FlagId(condition_str[1..].to_string())));
