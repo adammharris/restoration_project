@@ -3,7 +3,11 @@
 @start cellar
 
 ## @room cellar
+[!door_unlocked]
 You are in a dusty cellar. It's dark and smells of old wood. A single wooden door is to the north. It looks locked.
+
+[door_unlocked]
+You are in a dusty cellar. It's dark and smells of old wood. A single wooden door is to the north. It is unlocked.
 
 ### Try to open the north door [!has_key]
 - "The door is locked. It won't budge."

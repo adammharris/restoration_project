@@ -7,7 +7,7 @@ mod markdown_parser;
 
 use clap::{Parser, Subcommand};
 use world::load_world_from_markdown;
-use game::{GameState, get_available_choices, execute_actions};
+use game::{GameState, get_available_choices, execute_actions, get_room_description};
 use ui::{print_typewriter_effect, get_user_input, display_choices, parse_user_choice};
 use config::GameConfig;
 
@@ -149,7 +149,8 @@ fn play_story(story_file: &str, fast: bool, no_text_commands: bool) {
             return;
         }
     };
-    print_typewriter_effect(&format!("\n{}", current_room.description), &config);
+    let room_desc = get_room_description(current_room, &game_state);
+    print_typewriter_effect(&format!("\n{}", room_desc), &config);
 
     while !game_state.has_quit {
         // Only print room description if we have changed rooms
@@ -161,7 +162,8 @@ fn play_story(story_file: &str, fast: bool, no_text_commands: bool) {
                     return;
                 }
             };
-            print_typewriter_effect(&format!("\n{}", current_room.description), &config);
+            let room_desc = get_room_description(current_room, &game_state);
+            print_typewriter_effect(&format!("\n{}", room_desc), &config);
             last_room_id = game_state.current_room_id.clone();
         }
 

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::world::{World, Room, Choice, Action, Condition, FlagId};
+use crate::world::{World, Room, Choice, Action, Condition, FlagId, ConditionalDescription};
 use crate::errors::{GameError, GameResult};
 
 #[derive(Debug)]
@@ -12,8 +12,14 @@ struct MarkdownStory {
 #[derive(Debug)]
 struct MarkdownRoom {
     id: String,
-    description: String,
+    descriptions: Vec<MarkdownDescription>,
     choices: Vec<MarkdownChoice>,
+}
+
+#[derive(Debug)]
+struct MarkdownDescription {
+    condition: Option<Condition>,
+    text: String,
 }
 
 #[derive(Debug)]
@@ -71,26 +77,13 @@ fn parse_markdown(content: &str) -> GameResult<MarkdownStory> {
                 }
             }
             
-            // Start new room - collect description from following lines
-            let mut description_lines = Vec::new();
+            // Start new room - parse conditional descriptions
             i += 1;
-            
-            while i < lines.len() {
-                let desc_line = lines[i].trim();
-                if desc_line.is_empty() {
-                    i += 1;
-                    continue;
-                }
-                if desc_line.starts_with("###") || desc_line.starts_with("##") || desc_line.starts_with("#") {
-                    break;
-                }
-                description_lines.push(desc_line);
-                i += 1;
-            }
+            let descriptions = parse_room_descriptions(&lines, &mut i)?;
             
             current_room = Some(MarkdownRoom {
                 id: room_id,
-                description: description_lines.join(" "),
+                descriptions,
                 choices: Vec::new(),
             });
             continue; // Don't increment i again
@@ -139,6 +132,66 @@ fn parse_markdown(content: &str) -> GameResult<MarkdownStory> {
     }
     
     Ok(story)
+}
+
+fn parse_room_descriptions(lines: &[&str], i: &mut usize) -> GameResult<Vec<MarkdownDescription>> {
+    let mut descriptions = Vec::new();
+    let mut current_condition: Option<Condition> = None;
+    let mut current_text_lines = Vec::new();
+    
+    while *i < lines.len() {
+        let line = lines[*i].trim();
+        
+        // Empty line
+        if line.is_empty() {
+            *i += 1;
+            continue;
+        }
+        
+        // Stop at headers or choices
+        if line.starts_with("###") || line.starts_with("##") || line.starts_with("#") {
+            break;
+        }
+        
+        // Check for conditional block: [condition]
+        if line.starts_with('[') && line.ends_with(']') {
+            // Save previous description if exists
+            if !current_text_lines.is_empty() {
+                descriptions.push(MarkdownDescription {
+                    condition: current_condition.take(),
+                    text: current_text_lines.join(" "),
+                });
+                current_text_lines.clear();
+            }
+            
+            // Parse new condition from line like "[condition]"
+            let condition_str = &line[1..line.len()-1];
+            current_condition = parse_condition(condition_str).ok();
+        } else {
+            // Regular description text
+            current_text_lines.push(line);
+        }
+        
+        *i += 1;
+    }
+    
+    // Save final description
+    if !current_text_lines.is_empty() {
+        descriptions.push(MarkdownDescription {
+            condition: current_condition,
+            text: current_text_lines.join(" "),
+        });
+    }
+    
+    // If no conditional descriptions found, treat as single unconditional description
+    if descriptions.is_empty() {
+        return Ok(vec![MarkdownDescription {
+            condition: None,
+            text: String::new(),
+        }]);
+    }
+    
+    Ok(descriptions)
 }
 
 fn parse_title(line: &str) -> Option<String> {
@@ -333,8 +386,15 @@ fn convert_to_world(story: MarkdownStory) -> GameResult<World> {
             choices.insert(choice_id, choice);
         }
         
+        let descriptions = md_room.descriptions.into_iter().map(|md_desc| {
+            ConditionalDescription {
+                condition: md_desc.condition,
+                text: md_desc.text,
+            }
+        }).collect();
+        
         let room = Room {
-            description: md_room.description,
+            descriptions,
             choices: room_choices,
         };
         

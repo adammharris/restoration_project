@@ -1,7 +1,7 @@
 use std::collections::{HashSet, HashMap};
 use std::fs;
 use serde::{Serialize, Deserialize};
-use crate::world::{FlagId, Choice, Action, Condition, World};
+use crate::world::{FlagId, Choice, Action, Condition, World, Room};
 use crate::ui::print_typewriter_effect;
 use crate::errors::{GameError, GameResult};
 use crate::config::GameConfig;
@@ -129,4 +129,21 @@ pub fn get_available_choices<'a>(world: &'a World, game_state: &GameState) -> Ga
     }
     
     Ok(choices)
+}
+
+pub fn get_room_description(room: &Room, game_state: &GameState) -> String {
+    // Find the first matching conditional description
+    for description in &room.descriptions {
+        if let Some(condition) = &description.condition {
+            if check_single_condition(condition, game_state) {
+                return description.text.clone();
+            }
+        } else {
+            // Unconditional description - use as fallback
+            return description.text.clone();
+        }
+    }
+    
+    // No matching description found
+    String::new()
 }

@@ -22,8 +22,14 @@ pub struct World {
 
 #[derive(Debug, Deserialize)]
 pub struct Room {
-    pub description: String,
+    pub descriptions: Vec<ConditionalDescription>,
     pub choices: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ConditionalDescription {
+    pub condition: Option<Condition>,
+    pub text: String,
 }
 
 #[derive(Debug, Deserialize)]
