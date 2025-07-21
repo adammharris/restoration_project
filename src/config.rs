@@ -24,11 +24,12 @@ impl Default for GameConfig {
 
 impl GameConfig {
     pub fn load_or_create() -> GameResult<Self> {
-        let config_path = "restoration_config.toml";
+        let config_path = "restoration_config.json";
         
         if Path::new(config_path).exists() {
             let content = fs::read_to_string(config_path)?;
-            let config: GameConfig = toml::from_str(&content)?;
+            let config: GameConfig = serde_json::from_str(&content)
+                .map_err(|e| GameError::ValidationError(format!("Failed to parse config: {}", e)))?;
             Ok(config)
         } else {
             let default_config = GameConfig::default();
@@ -38,9 +39,9 @@ impl GameConfig {
     }
     
     pub fn save(&self) -> GameResult<()> {
-        let config_str = toml::to_string_pretty(self)
+        let config_str = serde_json::to_string_pretty(self)
             .map_err(|e| GameError::ValidationError(format!("Failed to serialize config: {}", e)))?;
-        fs::write("restoration_config.toml", config_str)?;
+        fs::write("restoration_config.json", config_str)?;
         Ok(())
     }
 }

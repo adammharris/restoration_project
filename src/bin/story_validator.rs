@@ -1,4 +1,4 @@
-use restoration_project::world::{load_world_from_toml, World};
+use restoration_project::world::{load_world_from_markdown, World};
 use restoration_project::errors::GameError;
 use std::env;
 use std::collections::HashSet;
@@ -6,8 +6,8 @@ use std::collections::HashSet;
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
-        eprintln!("Usage: story_validator <story.toml>");
-        eprintln!("Example: cargo run --bin story_validator the_cellar.toml");
+        eprintln!("Usage: story_validator <story.md>");
+        eprintln!("Example: cargo run --bin story_validator the_cellar.md");
         std::process::exit(1);
     }
 
@@ -38,7 +38,7 @@ pub struct StoryStats {
 }
 
 fn validate_story(path: &str) -> Result<StoryStats, GameError> {
-    let world = load_world_from_toml(path)?;
+    let world = load_world_from_markdown(path)?;
     
     // Additional validation checks
     let stats = analyze_story(&world)?;

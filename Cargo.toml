@@ -2,8 +2,14 @@
 name = "restoration_project"
 version = "0.1.0"
 edition = "2021"
+default-run = "restoration"
 
 [dependencies]
-toml = "0.8.13"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0"
+regex = "1.10"
+clap = { version = "4.5", features = ["derive", "env"] }
+
+[[bin]]
+name = "restoration"
+path = "src/main.rs"

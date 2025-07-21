@@ -3,33 +3,116 @@ mod game;
 mod ui;
 mod errors;
 mod config;
+mod markdown_parser;
 
-use std::env;
-use world::load_world_from_toml;
+use clap::{Parser, Subcommand};
+use world::load_world_from_markdown;
 use game::{GameState, get_available_choices, execute_actions};
 use ui::{print_typewriter_effect, get_user_input, display_choices, parse_user_choice};
 use config::GameConfig;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    let story_file = if args.len() > 1 { &args[1] } else { "the_cellar.toml" };
+#[derive(Parser)]
+#[command(name = "restoration")]
+#[command(about = "A text adventure game engine with Markdown story format")]
+#[command(version)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
 
-    let config = match GameConfig::load_or_create() {
+#[derive(Subcommand)]
+enum Commands {
+    /// Play a story (default command)
+    Play {
+        /// Story file to play
+        #[arg(value_name = "STORY", env = "RESTORATION_STORY")]
+        story: Option<String>,
+        
+        /// Skip typewriter effect (fast text)
+        #[arg(long, env = "RESTORATION_FAST")]
+        fast: bool,
+        
+        /// Disable text commands (numbers only)
+        #[arg(long, env = "RESTORATION_NO_TEXT")]
+        no_text_commands: bool,
+    },
+    
+    /// Validate a story file
+    Validate {
+        /// Story file to validate
+        #[arg(value_name = "STORY")]
+        story: String,
+    },
+    
+    /// Manage configuration
+    Config {
+        #[command(subcommand)]
+        action: ConfigAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConfigAction {
+    /// Show current configuration
+    Show,
+    /// Reset configuration to defaults
+    Reset,
+    /// Set typewriter speed (0 = instant, higher = slower)
+    SetSpeed { speed: u64 },
+    /// Enable/disable typewriter effect
+    SetTypewriter { enabled: bool },
+    /// Enable/disable text commands
+    SetTextCommands { enabled: bool },
+}
+
+fn main() {
+    let cli = Cli::parse();
+    
+    match cli.command {
+        Some(Commands::Play { story, fast, no_text_commands }) => {
+            let story_file = story.as_deref().unwrap_or("the_cellar.md");
+            play_story(story_file, fast, no_text_commands);
+        }
+        Some(Commands::Validate { story }) => {
+            validate_story(&story);
+        }
+        Some(Commands::Config { action }) => {
+            handle_config(action);
+        }
+        None => {
+            // Default: play with first argument as story file
+            let story_arg = std::env::args().nth(1);
+            let story_file = story_arg.as_deref().unwrap_or("the_cellar.md");
+            play_story(story_file, false, false);
+        }
+    }
+}
+
+fn play_story(story_file: &str, fast: bool, no_text_commands: bool) {
+    let mut config = match GameConfig::load_or_create() {
         Ok(config) => config,
         Err(e) => {
             eprintln!("Error loading config: {}", e);
             return;
         }
     };
+    
+    // Override config with command line options
+    if fast {
+        config.enable_typewriter = false;
+    }
+    if no_text_commands {
+        config.allow_text_commands = false;
+    }
 
-    let world = match load_world_from_toml(story_file) {
+    let world = match load_world_from_markdown(story_file) {
         Ok(world) => world,
         Err(e) => {
             eprintln!("Error loading story: {}", e);
             return;
         }
     };
-    let save_filename = format!("{}.save", story_file.replace(".toml", ""));
+    let save_filename = format!("{}.save", story_file.replace(".md", ""));
     
     let mut game_state = if GameState::has_save_file(&save_filename) {
         println!("Found save file. Load it? (y/n)");
@@ -149,5 +232,82 @@ fn main() {
     }
 
     println!("\nThank you for playing!");
+}
+
+fn validate_story(story_file: &str) {
+    match load_world_from_markdown(story_file) {
+        Ok(_) => {
+            println!("✅ Story '{}' is valid!", story_file);
+            // Run the detailed validation from story_validator
+            std::process::Command::new("cargo")
+                .args(&["run", "--bin", "story_validator", story_file])
+                .status()
+                .expect("Failed to run story validator");
+        }
+        Err(e) => {
+            eprintln!("❌ Story '{}' is invalid: {}", story_file, e);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn handle_config(action: ConfigAction) {
+    match action {
+        ConfigAction::Show => {
+            match GameConfig::load_or_create() {
+                Ok(config) => {
+                    println!("Current Configuration:");
+                    println!("  Typewriter enabled: {}", config.enable_typewriter);
+                    println!("  Typewriter speed: {} ms", config.typewriter_speed_ms);
+                    println!("  Text commands: {}", config.allow_text_commands);
+                    println!("  Auto save: {}", config.auto_save);
+                }
+                Err(e) => eprintln!("Error loading config: {}", e),
+            }
+        }
+        ConfigAction::Reset => {
+            let default_config = GameConfig::default();
+            match default_config.save() {
+                Ok(()) => println!("✅ Configuration reset to defaults"),
+                Err(e) => eprintln!("❌ Failed to reset config: {}", e),
+            }
+        }
+        ConfigAction::SetSpeed { speed } => {
+            match GameConfig::load_or_create() {
+                Ok(mut config) => {
+                    config.typewriter_speed_ms = speed;
+                    match config.save() {
+                        Ok(()) => println!("✅ Typewriter speed set to {} ms", speed),
+                        Err(e) => eprintln!("❌ Failed to save config: {}", e),
+                    }
+                }
+                Err(e) => eprintln!("Error loading config: {}", e),
+            }
+        }
+        ConfigAction::SetTypewriter { enabled } => {
+            match GameConfig::load_or_create() {
+                Ok(mut config) => {
+                    config.enable_typewriter = enabled;
+                    match config.save() {
+                        Ok(()) => println!("✅ Typewriter effect {}", if enabled { "enabled" } else { "disabled" }),
+                        Err(e) => eprintln!("❌ Failed to save config: {}", e),
+                    }
+                }
+                Err(e) => eprintln!("Error loading config: {}", e),
+            }
+        }
+        ConfigAction::SetTextCommands { enabled } => {
+            match GameConfig::load_or_create() {
+                Ok(mut config) => {
+                    config.allow_text_commands = enabled;
+                    match config.save() {
+                        Ok(()) => println!("✅ Text commands {}", if enabled { "enabled" } else { "disabled" }),
+                        Err(e) => eprintln!("❌ Failed to save config: {}", e),
+                    }
+                }
+                Err(e) => eprintln!("Error loading config: {}", e),
+            }
+        }
+    }
 }
 

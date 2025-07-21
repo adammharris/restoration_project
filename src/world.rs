@@ -61,24 +61,10 @@ pub enum Action {
     SetCounter(String, i32),
 }
 
-// --- TOML Loading ---
-#[derive(Debug, Deserialize)]
-pub struct TomlWorld {
-    pub rooms: HashMap<String, Room>,
-    pub choices: HashMap<String, Choice>,
-    pub starting_room_id: String,
-}
-
-pub fn load_world_from_toml(path: &str) -> GameResult<World> {
-    let toml_str = std::fs::read_to_string(path)?;
-    let toml_world: TomlWorld = toml::from_str(&toml_str)?;
-
-    let world = World { 
-        rooms: toml_world.rooms, 
-        choices: toml_world.choices, 
-        starting_room_id: toml_world.starting_room_id 
-    };
-
+// --- Markdown Loading ---
+pub fn load_world_from_markdown(path: &str) -> GameResult<World> {
+    let content = std::fs::read_to_string(path)?;
+    let world = crate::markdown_parser::parse_markdown_story(&content)?;
     validate_world(&world)?;
     Ok(world)
 }
