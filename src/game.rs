@@ -98,13 +98,21 @@ pub fn execute_actions(choice: &Choice, game_state: &mut GameState, config: &Gam
                 print_typewriter_effect(&format!("\n{}", text), config);
             }
             Action::IncrementCounter(counter) => {
+                let old_value = *game_state.counters.get(counter).unwrap_or(&0);
                 *game_state.counters.entry(counter.clone()).or_insert(0) += 1;
+                let new_value = *game_state.counters.get(counter).unwrap();
+                print_typewriter_effect(&format!("\n[{}: {} → {}]", counter, old_value, new_value), config);
             }
             Action::DecrementCounter(counter) => {
+                let old_value = *game_state.counters.get(counter).unwrap_or(&0);
                 *game_state.counters.entry(counter.clone()).or_insert(0) -= 1;
+                let new_value = *game_state.counters.get(counter).unwrap();
+                print_typewriter_effect(&format!("\n[{}: {} → {}]", counter, old_value, new_value), config);
             }
             Action::SetCounter(counter, value) => {
+                let old_value = *game_state.counters.get(counter).unwrap_or(&0);
                 game_state.counters.insert(counter.clone(), *value);
+                print_typewriter_effect(&format!("\n[{}: {} → {}]", counter, old_value, value), config);
             }
         }
     }
