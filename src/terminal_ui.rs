@@ -1,22 +1,21 @@
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, MouseEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    backend::{Backend, CrosstermBackend},
-    layout::{Alignment, Constraint, Direction, Layout, Margin},
+    backend::CrosstermBackend,
+    layout::{Constraint, Direction, Layout, Rect, Size},
     style::{Modifier, Style},
-    text::{Line, Span, Text},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
+use tui_scrollview::{ScrollView, ScrollViewState, ScrollbarVisibility};
 use std::io;
 use std::time::Duration;
 
 use crate::config::GameConfig;
-use crate::world::{Choice, World};
-use crate::game::GameState;
+use crate::world::Choice;
 
 pub struct TerminalUi {
     terminal: Terminal<CrosstermBackend<io::Stdout>>,
@@ -24,8 +23,7 @@ pub struct TerminalUi {
     current_choices: Vec<String>,
     selected_choice: usize,  // Currently selected choice index
     config: GameConfig,
-    list_state: ListState,
-    scroll_state: ScrollbarState,
+    scroll_view_state: ScrollViewState,
     choice_list_state: ListState, // Separate state for choices
 }
 
@@ -44,8 +42,7 @@ impl TerminalUi {
             current_choices: Vec::new(),
             selected_choice: 0,
             config,
-            list_state: ListState::default(),
-            scroll_state: ScrollbarState::default(),
+            scroll_view_state: ScrollViewState::default(),
             choice_list_state: ListState::default(),
         })
     }
@@ -67,88 +64,63 @@ impl TerminalUi {
             if self.config.enable_typewriter {
                 self.display_text_with_typewriter(text);
             } else {
-                self.add_wrapped_text(text);
+                self.all_text.push(text.to_string());
                 self.scroll_to_bottom();
             }
         }
-    }
-
-    fn add_wrapped_text(&mut self, text: &str) {
-        // Calculate available width (account for borders and margins)
-        let available_width = 60; // Conservative estimate for content width
-        let wrapped_lines = self.wrap_text(text, available_width);
-        self.all_text.extend(wrapped_lines);
-    }
-
-    fn wrap_text(&self, text: &str, width: usize) -> Vec<String> {
-        let mut lines = Vec::new();
-        let mut current_line = String::new();
-        
-        for word in text.split_whitespace() {
-            if current_line.is_empty() {
-                current_line = word.to_string();
-            } else if current_line.len() + 1 + word.len() <= width {
-                current_line.push(' ');
-                current_line.push_str(word);
-            } else {
-                lines.push(current_line);
-                current_line = word.to_string();
-            }
-        }
-        
-        if !current_line.is_empty() {
-            lines.push(current_line);
-        }
-        
-        if lines.is_empty() {
-            lines.push(text.to_string()); // Fallback for edge cases
-        }
-        
-        lines
     }
 
     fn display_text_with_typewriter(&mut self, text: &str) {
-        // For typewriter effect, we'll show character by character but still wrap properly
-        let available_width = 60; // Conservative estimate for content width
-        let wrapped_lines = self.wrap_text(text, available_width);
+        // Add a new line for this text
+        self.all_text.push(String::new());
+        let current_line_index = self.all_text.len() - 1;
         
-        for line in wrapped_lines {
-            // Add a new line for this wrapped line
-            self.all_text.push(String::new());
-            let current_line_index = self.all_text.len() - 1;
+        let mut current_text = String::new();
+        
+        for ch in text.chars() {
+            current_text.push(ch);
             
-            let mut current_text = String::new();
+            // Update the current line with the progress
+            self.all_text[current_line_index] = current_text.clone();
             
-            for ch in line.chars() {
-                current_text.push(ch);
-                
-                // Update the current line with the progress
-                self.all_text[current_line_index] = current_text.clone();
-                
-                // Auto-scroll to bottom
-                self.scroll_to_bottom();
-                
-                // Draw the updated display
-                let _ = self.draw();
-                
-                // Sleep for typewriter effect
-                std::thread::sleep(std::time::Duration::from_millis(self.config.typewriter_speed_ms));
+            // Capture values needed for drawing
+            let current_choices = self.current_choices.clone();
+            let mut scroll_view_state = self.scroll_view_state.clone();
+            let mut choice_list_state = self.choice_list_state.clone();
+            
+            // Force a complete redraw for each character
+            if let Err(e) = self.terminal.draw(|f| {
+                draw_terminal_content_with_scrollview(f, &self.all_text, &current_choices, &mut scroll_view_state, &mut choice_list_state);
+            }) {
+                eprintln!("Error drawing during typewriter: {}", e);
+                break;
             }
             
-            // Ensure the final text is set for this line
-            self.all_text[current_line_index] = line;
+            // Update states back
+            self.scroll_view_state = scroll_view_state;
+            self.choice_list_state = choice_list_state;
+            
+            // Sleep for typewriter effect
+            std::thread::sleep(std::time::Duration::from_millis(self.config.typewriter_speed_ms));
         }
         
-        self.scroll_to_bottom();
+        // Ensure the final text is set
+        self.all_text[current_line_index] = text.to_string();
+        
+        // Auto-scroll to bottom after completion
+        self.scroll_view_state.scroll_to_bottom();
     }
 
     fn scroll_to_bottom(&mut self) {
-        let total_items = self.all_text.len();
-        if total_items > 0 {
-            self.list_state.select(Some(total_items - 1));
-            self.scroll_state = self.scroll_state.content_length(total_items);
-            self.scroll_state = self.scroll_state.position(total_items.saturating_sub(1));
-        }
+        self.scroll_view_state.scroll_to_bottom();
+    }
+
+    pub fn scroll_up(&mut self) {
+        self.scroll_view_state.scroll_up();
+    }
+
+    pub fn scroll_down(&mut self) {
+        self.scroll_view_state.scroll_down();
     }
 
     pub fn display_choices(&mut self, choices: &[&Choice]) {
@@ -181,10 +153,6 @@ impl TerminalUi {
         }
     }
 
-    pub fn get_selected_choice(&self) -> usize {
-        self.selected_choice
-    }
-
     pub fn add_user_input(&mut self, input: &str) {
         // Show what the user typed
         self.all_text.push(format!("> {}", input));
@@ -197,8 +165,9 @@ impl TerminalUi {
             self.draw()?;
             
             if event::poll(Duration::from_millis(16))? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind == KeyEventKind::Press {
+                let event = event::read()?;
+                match event {
+                    Event::Key(key) if key.kind == KeyEventKind::Press => {
                         match key.code {
                             KeyCode::Enter => {
                                 if !self.current_choices.is_empty() {
@@ -209,10 +178,37 @@ impl TerminalUi {
                                 }
                             }
                             KeyCode::Up => {
-                                self.move_selection_up();
+                                if !self.current_choices.is_empty() {
+                                    self.move_selection_up();
+                                } else {
+                                    self.scroll_up();
+                                }
                             }
                             KeyCode::Down => {
-                                self.move_selection_down();
+                                if !self.current_choices.is_empty() {
+                                    self.move_selection_down();
+                                } else {
+                                    self.scroll_down();
+                                }
+                            }
+                            // Add Ctrl+ combinations for scrolling even with choices present
+                            KeyCode::Char('k') => {
+                                self.scroll_up();
+                            }
+                            KeyCode::Char('j') => {
+                                self.scroll_down();
+                            }
+                            KeyCode::PageUp => {
+                                for _ in 0..5 { self.scroll_up(); }
+                            }
+                            KeyCode::PageDown => {
+                                for _ in 0..5 { self.scroll_down(); }
+                            }
+                            KeyCode::Home => {
+                                self.scroll_view_state.scroll_to_top();
+                            }
+                            KeyCode::End => {
+                                self.scroll_view_state.scroll_to_bottom();
                             }
                             KeyCode::Esc => {
                                 return Ok("quit".to_string());
@@ -233,103 +229,40 @@ impl TerminalUi {
                             _ => {}
                         }
                     }
+                    Event::Mouse(mouse) => {
+                        match mouse.kind {
+                            MouseEventKind::ScrollUp => {
+                                self.scroll_up();
+                            }
+                            MouseEventKind::ScrollDown => {
+                                self.scroll_down();
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
     }
 
     fn draw(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let current_choices = self.current_choices.clone();
+        let mut scroll_view_state = self.scroll_view_state.clone();
+        let mut choice_list_state = self.choice_list_state.clone();
+        
         self.terminal.draw(|f| {
-            let main_layout = if !self.current_choices.is_empty() {
-                // Split into story area and choices area when choices are available
-                Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([
-                        Constraint::Min(10),        // Story area
-                        Constraint::Length(self.current_choices.len() as u16 + 2), // Choices area (with borders)
-                    ])
-                    .split(f.area())
-            } else {
-                // Full screen for story when no choices
-                Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([Constraint::Percentage(100)])
-                    .split(f.area())
-            };
-
-            let story_area = main_layout[0];
-            
-            // Story area layout with margins and scrollbar
-            let story_chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Percentage(10),  // Left margin
-                    Constraint::Percentage(78),  // Content (reduced for scrollbar)
-                    Constraint::Percentage(2),   // Scrollbar
-                    Constraint::Percentage(10),  // Right margin
-                ])
-                .split(story_area);
-
-            let content_area = story_chunks[1];
-            let scrollbar_area = story_chunks[2];
-
-            // Convert text lines to ListItems
-            let items: Vec<ListItem> = self.all_text
-                .iter()
-                .map(|line| ListItem::new(line.as_str()))
-                .collect();
-
-            // Create the scrollable story list
-            let story_list = List::new(items)
-                .block(Block::default().borders(Borders::ALL).title("Adventure"))
-                .style(Style::default());
-
-            // Render the story list with state for scrolling
-            f.render_stateful_widget(story_list, content_area, &mut self.list_state);
-
-            // Render scrollbar
-            let scrollbar = Scrollbar::default()
-                .orientation(ScrollbarOrientation::VerticalRight)
-                .begin_symbol(Some("↑"))
-                .end_symbol(Some("↓"));
-
-            f.render_stateful_widget(scrollbar, scrollbar_area, &mut self.scroll_state);
-
-            // Render choices area if choices are available
-            if !self.current_choices.is_empty() {
-                let choices_area = main_layout[1];
-                
-                // Choices area with margins
-                let choices_chunks = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([
-                        Constraint::Percentage(10),  // Left margin
-                        Constraint::Percentage(80),  // Choices content
-                        Constraint::Percentage(10),  // Right margin
-                    ])
-                    .split(choices_area);
-
-                let choices_content_area = choices_chunks[1];
-
-                // Convert choices to ListItems
-                let choice_items: Vec<ListItem> = self.current_choices
-                    .iter()
-                    .map(|choice| ListItem::new(choice.as_str()))
-                    .collect();
-
-                // Create the choices list with highlighting
-                let choices_list = List::new(choice_items)
-                    .block(Block::default().borders(Borders::ALL).title("Use ↑↓ arrows and Enter to select"))
-                    .style(Style::default())
-                    .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
-
-                // Render the choices list with state for selection
-                f.render_stateful_widget(choices_list, choices_content_area, &mut self.choice_list_state);
-            }
+            draw_terminal_content_with_scrollview(f, &self.all_text, &current_choices, &mut scroll_view_state, &mut choice_list_state);
         })?;
+
+        // Update states back
+        self.scroll_view_state = scroll_view_state;
+        self.choice_list_state = choice_list_state;
 
         Ok(())
     }
+
+
 
     pub fn clear_text(&mut self) {
         // Don't clear all text, just add a separator for new rooms
@@ -338,4 +271,144 @@ impl TerminalUi {
         self.all_text.push("".to_string());
         self.scroll_to_bottom();
     }
+}
+
+// Standalone function for drawing terminal content with ScrollView to avoid borrowing issues
+fn draw_terminal_content_with_scrollview(
+    f: &mut Frame, 
+    all_text: &[String], 
+    current_choices: &[String], 
+    scroll_view_state: &mut ScrollViewState,
+    choice_list_state: &mut ListState
+) {
+    let main_layout = if !current_choices.is_empty() {
+        // Split into story area and choices area when choices are available
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(10),        // Story area
+                Constraint::Length(current_choices.len() as u16 + 2), // Choices area (with borders)
+            ])
+            .split(f.area())
+    } else {
+        // Full screen for story when no choices
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(100)])
+            .split(f.area())
+    };
+
+    let story_area = main_layout[0];
+    
+    // Story area layout with margins
+    let story_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(10),  // Left margin
+            Constraint::Percentage(80),  // Content
+            Constraint::Percentage(10),  // Right margin
+        ])
+        .split(story_area);
+
+    let content_area = story_chunks[1];
+
+    // Create the content text from all text lines
+    let raw_content = all_text.join("\n");
+    
+    // Pre-wrap text to fit the content area width
+    let content_width = content_area.width.saturating_sub(2); // Account for borders
+    let wrapped_lines = wrap_text_to_width(&raw_content, content_width as usize);
+    let content_text = wrapped_lines.join("\n");
+    let content_height = wrapped_lines.len() as u16;
+    
+    let content_size = Size::new(content_width, content_height);
+    
+    // Create the scrollable content with ScrollView
+    let title = if current_choices.is_empty() {
+        "Adventure - Use ↑↓ arrows, j/k, Page Up/Down, Home/End, or mouse wheel to scroll"
+    } else {
+        "Adventure"
+    };
+    
+    let mut scroll_view = ScrollView::new(content_size)
+        .horizontal_scrollbar_visibility(ScrollbarVisibility::Never);
+    
+    // Create a paragraph widget to render inside the scroll view (no wrap needed since we pre-wrapped)
+    let paragraph = Paragraph::new(content_text);
+    
+    // Render the paragraph inside the scroll view
+    let scroll_area = Rect::new(0, 0, content_width, content_height);
+    scroll_view.render_widget(paragraph, scroll_area);
+    
+    // Create a bordered area for the scroll view
+    let block = Block::default().borders(Borders::ALL).title(title);
+    let inner_area = block.inner(content_area);
+    
+    // Render the block first, then the scroll view inside
+    f.render_widget(block, content_area);
+    f.render_stateful_widget(scroll_view, inner_area, scroll_view_state);
+
+    // Render choices area if choices are available
+    if !current_choices.is_empty() {
+        let choices_area = main_layout[1];
+        
+        // Choices area with margins
+        let choices_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(10),  // Left margin
+                Constraint::Percentage(80),  // Choices content
+                Constraint::Percentage(10),  // Right margin
+            ])
+            .split(choices_area);
+
+        let choices_content_area = choices_chunks[1];
+
+        // Convert choices to ListItems
+        let choice_items: Vec<ListItem> = current_choices
+            .iter()
+            .map(|choice| ListItem::new(choice.as_str()))
+            .collect();
+
+        // Create the choices list with highlighting
+        let choices_list = List::new(choice_items)
+            .block(Block::default().borders(Borders::ALL).title("↑↓ arrows + Enter to select | j/k or mouse wheel to scroll"))
+            .style(Style::default())
+            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+
+        // Render the choices list with state for selection
+        f.render_stateful_widget(choices_list, choices_content_area, choice_list_state);
+    }
+}
+
+// Helper function to wrap text to a specific width
+fn wrap_text_to_width(text: &str, width: usize) -> Vec<String> {
+    let mut wrapped_lines = Vec::new();
+    
+    for line in text.lines() {
+        if line.is_empty() {
+            wrapped_lines.push(String::new());
+            continue;
+        }
+        
+        let mut current_line = String::new();
+        
+        for word in line.split_whitespace() {
+            if current_line.is_empty() {
+                current_line = word.to_string();
+            } else if current_line.len() + 1 + word.len() <= width {
+                current_line.push(' ');
+                current_line.push_str(word);
+            } else {
+                wrapped_lines.push(current_line);
+                current_line = word.to_string();
+            }
+        }
+        
+        if !current_line.is_empty() {
+            wrapped_lines.push(current_line);
+        }
+    }
+    
+    wrapped_lines
 }

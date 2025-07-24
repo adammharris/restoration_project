@@ -61,14 +61,6 @@ pub fn print_game_text(text: &str, config: &GameConfig) {
     }
 }
 
-/*pub fn print_game_line(text: &str, config: &GameConfig) {
-    if config.center_text {
-        print_line(&center_single_line(text), config);
-    } else {
-        print_line(text, config);
-    }
-}*/
-
 fn print_line(text: &str, config: &GameConfig) {
     if config.enable_typewriter {
         // Print leading whitespace instantly, then animate the content
@@ -118,22 +110,6 @@ fn get_content_margin() -> usize {
         (terminal_width.saturating_sub(content_width)) / 2
     } else {
         0
-    }
-}
-
-fn center_single_line(text: &str) -> String {
-    if let Some((width, _)) = terminal_size::terminal_size() {
-        let terminal_width = width.0 as usize;
-        let text_width = text.chars().count();
-        
-        if text_width < terminal_width {
-            let padding = (terminal_width - text_width) / 2;
-            format!("{}{}", " ".repeat(padding), text)
-        } else {
-            text.to_string()
-        }
-    } else {
-        text.to_string()
     }
 }
 
