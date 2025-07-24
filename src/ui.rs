@@ -3,9 +3,83 @@ use std::thread;
 use std::time::Duration;
 use crate::config::GameConfig;
 
-pub fn print_typewriter_effect(text: &str, config: &GameConfig) {
+const IDEAL_LINE_LENGTH: usize = 80;
+const MIN_MARGIN: usize = 4;
+
+fn wrap_and_center_text(text: &str) -> Vec<String> {
+    if let Some((width, _)) = terminal_size::terminal_size() {
+        let terminal_width = width.0 as usize;
+        let content_width = std::cmp::min(IDEAL_LINE_LENGTH, terminal_width.saturating_sub(MIN_MARGIN * 2));
+        let margin = (terminal_width.saturating_sub(content_width)) / 2;
+        
+        let wrapped_lines = wrap_text(text, content_width);
+        wrapped_lines.iter()
+            .map(|line| format!("{}{}", " ".repeat(margin), line))
+            .collect()
+    } else {
+        // Fallback without terminal size
+        wrap_text(text, IDEAL_LINE_LENGTH)
+    }
+}
+
+fn wrap_text(text: &str, width: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+    
+    for word in text.split_whitespace() {
+        if current_line.is_empty() {
+            current_line = word.to_string();
+        } else if current_line.len() + 1 + word.len() <= width {
+            current_line.push(' ');
+            current_line.push_str(word);
+        } else {
+            lines.push(current_line);
+            current_line = word.to_string();
+        }
+    }
+    
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+    
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+    
+    lines
+}
+
+pub fn print_game_text(text: &str, config: &GameConfig) {
+    use crate::config::UiMode;
+    if config.ui_mode == UiMode::Centered {
+        let lines = wrap_and_center_text(text);
+        for line in lines {
+            print_line(&line, config);
+        }
+    } else {
+        print_line(text, config);
+    }
+}
+
+/*pub fn print_game_line(text: &str, config: &GameConfig) {
+    if config.center_text {
+        print_line(&center_single_line(text), config);
+    } else {
+        print_line(text, config);
+    }
+}*/
+
+fn print_line(text: &str, config: &GameConfig) {
     if config.enable_typewriter {
-        for c in text.chars() {
+        // Print leading whitespace instantly, then animate the content
+        let leading_spaces = text.len() - text.trim_start().len();
+        if leading_spaces > 0 {
+            print!("{}", &text[..leading_spaces]);
+            io::stdout().flush().unwrap();
+        }
+        
+        // Animate the actual content
+        for c in text.trim_start().chars() {
             print!("{}", c);
             io::stdout().flush().unwrap();
             thread::sleep(Duration::from_millis(config.typewriter_speed_ms));
@@ -16,8 +90,20 @@ pub fn print_typewriter_effect(text: &str, config: &GameConfig) {
     }
 }
 
-pub fn get_user_input() -> Result<String, io::Error> {
-    print!("> ");
+// Keep the old function for backwards compatibility
+pub fn print_typewriter_effect(text: &str, config: &GameConfig) {
+    print_game_text(text, config);
+}
+
+pub fn get_user_input(config: &GameConfig) -> Result<String, io::Error> {
+    use crate::config::UiMode;
+    if config.ui_mode == UiMode::Centered {
+        // Align with the choice margin
+        let margin = get_content_margin();
+        print!("{}{}", " ".repeat(margin), "> ");
+    } else {
+        print!("> ");
+    }
     io::stdout().flush()?;
     
     let mut input = String::new();
@@ -25,10 +111,36 @@ pub fn get_user_input() -> Result<String, io::Error> {
     Ok(input.trim().to_string())
 }
 
+fn get_content_margin() -> usize {
+    if let Some((width, _)) = terminal_size::terminal_size() {
+        let terminal_width = width.0 as usize;
+        let content_width = std::cmp::min(IDEAL_LINE_LENGTH, terminal_width.saturating_sub(MIN_MARGIN * 2));
+        (terminal_width.saturating_sub(content_width)) / 2
+    } else {
+        0
+    }
+}
+
+fn center_single_line(text: &str) -> String {
+    if let Some((width, _)) = terminal_size::terminal_size() {
+        let terminal_width = width.0 as usize;
+        let text_width = text.chars().count();
+        
+        if text_width < terminal_width {
+            let padding = (terminal_width - text_width) / 2;
+            format!("{}{}", " ".repeat(padding), text)
+        } else {
+            text.to_string()
+        }
+    } else {
+        text.to_string()
+    }
+}
+
 pub fn display_choices(choices: &[&crate::world::Choice], config: &GameConfig) {
     for (i, choice) in choices.iter().enumerate() {
-        print!("{}: ", i + 1);
-        print_typewriter_effect(&choice.text, config);
+        let full_choice = format!("{}: {}", i + 1, choice.text);
+        print_game_text(&full_choice, config);
     }
 }
 

@@ -303,7 +303,8 @@ fn parse_action(action_str: &str) -> GameResult<Action> {
         return Ok(Action::Quit);
     }
     
-    Err(GameError::ValidationError(format!("Unknown action: {}", action_str)))
+    // Default: treat as display text (no quotes needed)
+    Ok(Action::DisplayText(action_str.to_string()))
 }
 
 fn parse_condition(condition_str: &str) -> GameResult<Condition> {

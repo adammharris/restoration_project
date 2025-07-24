@@ -4,12 +4,14 @@ mod ui;
 mod errors;
 mod config;
 mod markdown_parser;
+mod terminal_ui;
 
 use clap::{Parser, Subcommand};
 use world::load_world_from_markdown;
 use game::{GameState, get_available_choices, execute_actions, get_room_description};
-use ui::{print_typewriter_effect, get_user_input, display_choices, parse_user_choice};
-use config::GameConfig;
+use ui::{print_typewriter_effect, get_user_input, display_choices, parse_user_choice, print_game_text};
+use terminal_ui::TerminalUi;
+use config::{GameConfig, UiMode};
 
 #[derive(Parser)]
 #[command(name = "restoration")]
@@ -59,10 +61,18 @@ enum ConfigAction {
     Reset,
     /// Set typewriter speed (0 = instant, higher = slower)
     SetSpeed { speed: u64 },
-    /// Enable/disable typewriter effect
-    SetTypewriter { enabled: bool },
-    /// Enable/disable text commands
-    SetTextCommands { enabled: bool },
+    /// Enable typewriter effect
+    EnableTypewriter,
+    /// Disable typewriter effect  
+    DisableTypewriter,
+    /// Enable text commands
+    EnableTextCommands,
+    /// Disable text commands
+    DisableTextCommands,
+    /// Enable centered UI mode
+    EnableUiMode,
+    /// Disable centered UI mode (plain mode)
+    DisableUiMode,
 }
 
 fn main() {
@@ -112,20 +122,28 @@ fn play_story(story_file: &str, fast: bool, no_text_commands: bool) {
             return;
         }
     };
+
+    match config.ui_mode {
+        UiMode::Centered => play_story_terminal_ui(story_file, world, config),
+        UiMode::Plain => play_story_plain(story_file, world, config),
+    }
+}
+
+fn play_story_plain(story_file: &str, world: world::World, config: GameConfig) {
     let save_filename = format!("{}.save", story_file.replace(".md", ""));
     
     let mut game_state = if GameState::has_save_file(&save_filename) {
-        println!("Found save file. Load it? (y/n)");
+        print_game_text("Found save file. Load it? (y/n)", &config);
         let mut input = String::new();
         if std::io::stdin().read_line(&mut input).is_ok() && input.trim().eq_ignore_ascii_case("y") {
             match GameState::load_from_file(&save_filename) {
                 Ok(state) => {
-                    println!("Game loaded successfully!");
+                    print_game_text("Game loaded successfully!", &config);
                     state
                 }
                 Err(e) => {
                     eprintln!("Failed to load save file: {}", e);
-                    println!("Starting new game...");
+                    print_game_text("Starting new game...", &config);
                     GameState::new(world.starting_room_id.clone())
                 }
             }
@@ -138,8 +156,8 @@ fn play_story(story_file: &str, fast: bool, no_text_commands: bool) {
     
     let mut last_room_id = game_state.current_room_id.clone(); // Track the last room
 
-    println!("--- Welcome to the Restoration Project ---");
-    println!("Special commands: 'save' to save game, 'load' to load game, 'quit' to exit");
+    //print_game_line("--- Welcome to the Restoration Project ---", &config);
+    //print_game_text("Special commands: 'save' to save game, 'load' to load game, 'quit' to exit", &config);
 
     // Initial room description
     let current_room = match world.rooms.get(&game_state.current_room_id) {
@@ -176,14 +194,14 @@ fn play_story(story_file: &str, fast: bool, no_text_commands: bool) {
         };
 
         if available_choices.is_empty() {
-            println!("There is nothing you can do here.");
+            print_game_text("There is nothing you can do here.", &config);
             game_state.has_quit = true;
             continue;
         }
 
         display_choices(&available_choices, &config);
 
-        let input = match get_user_input() {
+        let input = match get_user_input(&config) {
             Ok(input) => input,
             Err(_) => {
                 println!("Error reading input.");
@@ -195,7 +213,7 @@ fn play_story(story_file: &str, fast: bool, no_text_commands: bool) {
         match input.trim().to_lowercase().as_str() {
             "save" => {
                 match game_state.save_to_file(&save_filename) {
-                    Ok(()) => println!("Game saved successfully!"),
+                    Ok(()) => print_game_text("Game saved successfully!", &config),
                     Err(e) => eprintln!("Failed to save game: {}", e),
                 }
                 continue;
@@ -205,7 +223,7 @@ fn play_story(story_file: &str, fast: bool, no_text_commands: bool) {
                     Ok(loaded_state) => {
                         game_state = loaded_state;
                         last_room_id = "".to_string(); // Force room description to show
-                        println!("Game loaded successfully!");
+                        print_game_text("Game loaded successfully!", &config);
                     }
                     Err(e) => eprintln!("Failed to load game: {}", e),
                 }
@@ -225,15 +243,198 @@ fn play_story(story_file: &str, fast: bool, no_text_commands: bool) {
             }
             None => {
                 if config.allow_text_commands {
-                    println!("I don't understand '{}'. Try typing a number or describing your action.", input);
+                    print_game_text(&format!("I don't understand '{}'. Try typing a number or describing your action.", input), &config);
                 } else {
-                    println!("That's not a valid choice number.");
+                    print_game_text("That's not a valid choice number.", &config);
                 }
             }
         }
     }
 
-    println!("\nThank you for playing!");
+    print_game_text("\nThank you for playing!", &config);
+}
+
+fn play_story_terminal_ui(story_file: &str, world: world::World, config: GameConfig) {
+    let mut terminal_ui = match TerminalUi::new(config.clone()) {
+        Ok(ui) => ui,
+        Err(e) => {
+            eprintln!("Failed to initialize terminal UI: {}", e);
+            return;
+        }
+    };
+
+    let save_filename = format!("{}.save", story_file.replace(".md", ""));
+    
+    let mut game_state = if GameState::has_save_file(&save_filename) {
+        terminal_ui.display_text("Found save file. Load it? (y/n)");
+        match terminal_ui.get_input() {
+            Ok(input) if input.trim().eq_ignore_ascii_case("y") => {
+                match GameState::load_from_file(&save_filename) {
+                    Ok(state) => {
+                        terminal_ui.display_text("Game loaded successfully!");
+                        state
+                    }
+                    Err(e) => {
+                        terminal_ui.display_text(&format!("Failed to load save file: {}", e));
+                        terminal_ui.display_text("Starting new game...");
+                        GameState::new(world.starting_room_id.clone())
+                    }
+                }
+            }
+            _ => GameState::new(world.starting_room_id.clone()),
+        }
+    } else {
+        GameState::new(world.starting_room_id.clone())
+    };
+    
+    let mut last_room_id = game_state.current_room_id.clone();
+
+    terminal_ui.display_text("--- Welcome to the Restoration Project ---");
+    terminal_ui.display_text("Special commands: 'save' to save game, 'load' to load game, 'quit' to exit");
+
+    // Initial room description
+    let current_room = match world.rooms.get(&game_state.current_room_id) {
+        Some(room) => room,
+        None => {
+            terminal_ui.display_text(&format!("Error: Starting room '{}' not found!", game_state.current_room_id));
+            let _ = terminal_ui.cleanup();
+            return;
+        }
+    };
+    let room_desc = get_room_description(current_room, &game_state);
+    terminal_ui.display_text(&format!("\n{}", room_desc));
+
+    while !game_state.has_quit {
+        // Only display room description if we have changed rooms
+        if last_room_id != game_state.current_room_id {
+            let current_room = match world.rooms.get(&game_state.current_room_id) {
+                Some(room) => room,
+                None => {
+                    terminal_ui.display_text(&format!("Error: Room '{}' not found!", game_state.current_room_id));
+                    break;
+                }
+            };
+            let room_desc = get_room_description(current_room, &game_state);
+            terminal_ui.clear_text();
+            terminal_ui.display_text(&format!("\n{}", room_desc));
+            last_room_id = game_state.current_room_id.clone();
+        }
+
+        let available_choices = match get_available_choices(&world, &game_state) {
+            Ok(choices) => choices,
+            Err(e) => {
+                terminal_ui.display_text(&format!("Error getting choices: {}", e));
+                break;
+            }
+        };
+
+        if available_choices.is_empty() {
+            terminal_ui.display_text("There is nothing you can do here.");
+            game_state.has_quit = true;
+            continue;
+        }
+
+        terminal_ui.display_choices(&available_choices);
+
+        let input = match terminal_ui.get_input() {
+            Ok(input) => input,
+            Err(_) => {
+                terminal_ui.display_text("Error reading input.");
+                continue;
+            }
+        };
+
+        // Handle special commands first
+        match input.trim().to_lowercase().as_str() {
+            "save" => {
+                match game_state.save_to_file(&save_filename) {
+                    Ok(()) => terminal_ui.display_text("Game saved successfully!"),
+                    Err(e) => terminal_ui.display_text(&format!("Failed to save game: {}", e)),
+                }
+                continue;
+            }
+            "load" => {
+                match GameState::load_from_file(&save_filename) {
+                    Ok(loaded_state) => {
+                        game_state = loaded_state;
+                        last_room_id = "".to_string(); // Force room description to show
+                        terminal_ui.display_text("Game loaded successfully!");
+                    }
+                    Err(e) => terminal_ui.display_text(&format!("Failed to load game: {}", e)),
+                }
+                continue;
+            }
+            "quit" | "exit" => {
+                game_state.has_quit = true;
+                continue;
+            }
+            _ => {}
+        }
+
+        match parse_user_choice(&input, &available_choices, &config) {
+            Some(choice_index) => {
+                let choice = available_choices[choice_index];
+                // Execute actions and capture any text output for terminal UI
+                execute_actions_terminal_ui(choice, &mut game_state, &mut terminal_ui);
+            }
+            None => {
+                if config.allow_text_commands {
+                    terminal_ui.display_text(&format!("I don't understand '{}'. Try typing a number or describing your action.", input));
+                } else {
+                    terminal_ui.display_text("That's not a valid choice number.");
+                }
+            }
+        }
+    }
+
+    terminal_ui.display_text("\nThank you for playing!");
+    let _ = terminal_ui.cleanup();
+}
+
+fn execute_actions_terminal_ui(choice: &world::Choice, game_state: &mut game::GameState, terminal_ui: &mut terminal_ui::TerminalUi) {
+    use crate::world::Action;
+    use crate::game::check_single_condition;
+    
+    for action in &choice.actions {
+        match action {
+            Action::GoTo(room_id) => game_state.current_room_id = room_id.clone(),
+            Action::SetFlag(flag_id) => {
+                game_state.flags.insert(flag_id.clone());
+            }
+            Action::RemoveFlag(flag_id) => {
+                game_state.flags.remove(flag_id);
+            }
+            Action::Quit => game_state.has_quit = true,
+            Action::DisplayText(text) => {
+                terminal_ui.display_text(text);
+            }
+            Action::DisplayTextConditional { condition, text_if_true, text_if_false } => {
+                let text = if check_single_condition(condition, game_state) {
+                    text_if_true
+                } else {
+                    text_if_false
+                };
+                terminal_ui.display_text(text);
+            }
+            Action::IncrementCounter(counter) => {
+                let old_value = *game_state.counters.get(counter).unwrap_or(&0);
+                *game_state.counters.entry(counter.clone()).or_insert(0) += 1;
+                let new_value = *game_state.counters.get(counter).unwrap();
+                terminal_ui.display_text(&format!("[{}: {} → {}]", counter, old_value, new_value));
+            }
+            Action::DecrementCounter(counter) => {
+                let old_value = *game_state.counters.get(counter).unwrap_or(&0);
+                *game_state.counters.entry(counter.clone()).or_insert(0) -= 1;
+                let new_value = *game_state.counters.get(counter).unwrap();
+                terminal_ui.display_text(&format!("[{}: {} → {}]", counter, old_value, new_value));
+            }
+            Action::SetCounter(counter, value) => {
+                let old_value = *game_state.counters.get(counter).unwrap_or(&0);
+                game_state.counters.insert(counter.clone(), *value);
+                terminal_ui.display_text(&format!("[{}: {} → {}]", counter, old_value, value));
+            }
+        }
+    }
 }
 
 fn validate_story(story_file: &str) {
@@ -263,6 +464,7 @@ fn handle_config(action: ConfigAction) {
                     println!("  Typewriter speed: {} ms", config.typewriter_speed_ms);
                     println!("  Text commands: {}", config.allow_text_commands);
                     println!("  Auto save: {}", config.auto_save);
+                    println!("  UI mode: {:?}", config.ui_mode);
                 }
                 Err(e) => eprintln!("Error loading config: {}", e),
             }
@@ -286,24 +488,72 @@ fn handle_config(action: ConfigAction) {
                 Err(e) => eprintln!("Error loading config: {}", e),
             }
         }
-        ConfigAction::SetTypewriter { enabled } => {
+        ConfigAction::EnableTypewriter => {
             match GameConfig::load_or_create() {
                 Ok(mut config) => {
-                    config.enable_typewriter = enabled;
+                    config.enable_typewriter = true;
                     match config.save() {
-                        Ok(()) => println!("✅ Typewriter effect {}", if enabled { "enabled" } else { "disabled" }),
+                        Ok(()) => println!("✅ Typewriter effect enabled"),
                         Err(e) => eprintln!("❌ Failed to save config: {}", e),
                     }
                 }
                 Err(e) => eprintln!("Error loading config: {}", e),
             }
         }
-        ConfigAction::SetTextCommands { enabled } => {
+        ConfigAction::DisableTypewriter => {
             match GameConfig::load_or_create() {
                 Ok(mut config) => {
-                    config.allow_text_commands = enabled;
+                    config.enable_typewriter = false;
                     match config.save() {
-                        Ok(()) => println!("✅ Text commands {}", if enabled { "enabled" } else { "disabled" }),
+                        Ok(()) => println!("✅ Typewriter effect disabled"),
+                        Err(e) => eprintln!("❌ Failed to save config: {}", e),
+                    }
+                }
+                Err(e) => eprintln!("Error loading config: {}", e),
+            }
+        }
+        ConfigAction::EnableTextCommands => {
+            match GameConfig::load_or_create() {
+                Ok(mut config) => {
+                    config.allow_text_commands = true;
+                    match config.save() {
+                        Ok(()) => println!("✅ Text commands enabled"),
+                        Err(e) => eprintln!("❌ Failed to save config: {}", e),
+                    }
+                }
+                Err(e) => eprintln!("Error loading config: {}", e),
+            }
+        }
+        ConfigAction::DisableTextCommands => {
+            match GameConfig::load_or_create() {
+                Ok(mut config) => {
+                    config.allow_text_commands = false;
+                    match config.save() {
+                        Ok(()) => println!("✅ Text commands disabled"),
+                        Err(e) => eprintln!("❌ Failed to save config: {}", e),
+                    }
+                }
+                Err(e) => eprintln!("Error loading config: {}", e),
+            }
+        }
+        ConfigAction::EnableUiMode => {
+            match GameConfig::load_or_create() {
+                Ok(mut config) => {
+                    config.ui_mode = UiMode::Centered;
+                    match config.save() {
+                        Ok(()) => println!("✅ Centered UI mode enabled"),
+                        Err(e) => eprintln!("❌ Failed to save config: {}", e),
+                    }
+                }
+                Err(e) => eprintln!("Error loading config: {}", e),
+            }
+        }
+        ConfigAction::DisableUiMode => {
+            match GameConfig::load_or_create() {
+                Ok(mut config) => {
+                    config.ui_mode = UiMode::Plain;
+                    match config.save() {
+                        Ok(()) => println!("✅ Plain UI mode enabled"),
                         Err(e) => eprintln!("❌ Failed to save config: {}", e),
                     }
                 }

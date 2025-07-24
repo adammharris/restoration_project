@@ -51,7 +51,7 @@ pub fn check_condition(choice: &Choice, game_state: &GameState) -> bool {
     }
 }
 
-fn check_single_condition(condition: &Condition, game_state: &GameState) -> bool {
+pub fn check_single_condition(condition: &Condition, game_state: &GameState) -> bool {
     match condition {
         Condition::HasFlag(flag_id) => game_state.flags.contains(flag_id),
         Condition::NotHasFlag(flag_id) => !game_state.flags.contains(flag_id),

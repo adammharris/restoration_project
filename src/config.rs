@@ -3,12 +3,19 @@ use std::fs;
 use std::path::Path;
 use crate::errors::{GameError, GameResult};
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum UiMode {
+    Plain,    // Original terminal output
+    Centered, // Full-screen centered UI with resize handling
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameConfig {
     pub typewriter_speed_ms: u64,
     pub enable_typewriter: bool,
     pub allow_text_commands: bool,
     pub auto_save: bool,
+    pub ui_mode: UiMode,
 }
 
 impl Default for GameConfig {
@@ -18,6 +25,7 @@ impl Default for GameConfig {
             enable_typewriter: true,
             allow_text_commands: true,
             auto_save: false,
+            ui_mode: UiMode::Plain,
         }
     }
 }
