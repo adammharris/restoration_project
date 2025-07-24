@@ -289,8 +289,8 @@ fn play_story_terminal_ui(story_file: &str, world: world::World, config: GameCon
     
     let mut last_room_id = game_state.current_room_id.clone();
 
-    terminal_ui.display_text("--- Welcome to the Restoration Project ---");
-    terminal_ui.display_text("Special commands: 'save' to save game, 'load' to load game, 'quit' to exit");
+    //terminal_ui.display_text("--- Welcome to the Restoration Project ---");
+    //terminal_ui.display_text("Special commands: 'save' to save game, 'load' to load game, 'quit' to exit");
 
     // Initial room description
     let current_room = match world.rooms.get(&game_state.current_room_id) {

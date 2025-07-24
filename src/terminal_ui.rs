@@ -324,12 +324,8 @@ fn draw_terminal_content_with_scrollview(
     let content_size = Size::new(content_width, content_height);
     
     // Create the scrollable content with ScrollView
-    let title = if current_choices.is_empty() {
-        "Adventure - Use ↑↓ arrows, j/k, Page Up/Down, Home/End, or mouse wheel to scroll"
-    } else {
-        "Adventure"
-    };
-    
+    let title = "Restoration Project";
+
     let mut scroll_view = ScrollView::new(content_size)
         .horizontal_scrollbar_visibility(ScrollbarVisibility::Never);
     
