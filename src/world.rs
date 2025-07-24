@@ -13,33 +13,33 @@ pub struct ChoiceId(pub String);
 pub struct FlagId(pub String);
 
 // --- Static World Data ---
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct World {
     pub rooms: HashMap<String, Room>,
     pub choices: HashMap<String, Choice>,
     pub starting_room_id: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Room {
     pub descriptions: Vec<ConditionalDescription>,
     pub choices: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ConditionalDescription {
     pub condition: Option<Condition>,
     pub text: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Choice {
     pub text: String,
     pub condition: Option<Condition>,
     pub actions: Vec<Action>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum Condition {
     HasFlag(FlagId),
     NotHasFlag(FlagId),
@@ -52,7 +52,7 @@ pub enum Condition {
     Or(Box<Condition>, Box<Condition>),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum Action {
     GoTo(String),
     SetFlag(FlagId),
@@ -72,7 +72,11 @@ pub enum Action {
 // --- Markdown Loading ---
 pub fn load_world_from_markdown(path: &str) -> GameResult<World> {
     let content = std::fs::read_to_string(path)?;
-    let world = crate::markdown_parser::parse_markdown_story(&content)?;
+    load_world_from_markdown_content(&content)
+}
+
+pub fn load_world_from_markdown_content(content: &str) -> GameResult<World> {
+    let world = crate::markdown_parser::parse_markdown_story(content)?;
     validate_world(&world)?;
     Ok(world)
 }

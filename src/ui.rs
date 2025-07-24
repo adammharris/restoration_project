@@ -1,11 +1,15 @@
+#[cfg(not(target_arch = "wasm32"))]
 use std::io::{self, Write};
+#[cfg(not(target_arch = "wasm32"))]
 use std::thread;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
 use crate::config::GameConfig;
 
 const IDEAL_LINE_LENGTH: usize = 80;
 const MIN_MARGIN: usize = 4;
 
+#[cfg(not(target_arch = "wasm32"))]
 fn wrap_and_center_text(text: &str) -> Vec<String> {
     if let Some((width, _)) = terminal_size::terminal_size() {
         let terminal_width = width.0 as usize;
@@ -22,6 +26,7 @@ fn wrap_and_center_text(text: &str) -> Vec<String> {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn wrap_text(text: &str, width: usize) -> Vec<String> {
     let mut lines = Vec::new();
     let mut current_line = String::new();
@@ -49,8 +54,10 @@ fn wrap_text(text: &str, width: usize) -> Vec<String> {
     lines
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn print_game_text(text: &str, config: &GameConfig) {
     use crate::config::UiMode;
+    use std::io::{self, Write};
     if config.ui_mode == UiMode::Centered {
         let lines = wrap_and_center_text(text);
         for line in lines {
@@ -61,7 +68,11 @@ pub fn print_game_text(text: &str, config: &GameConfig) {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn print_line(text: &str, config: &GameConfig) {
+    use std::io::{self, Write};
+    use std::thread;
+    use std::time::Duration;
     if config.enable_typewriter {
         // Print leading whitespace instantly, then animate the content
         let leading_spaces = text.len() - text.trim_start().len();
@@ -83,11 +94,17 @@ fn print_line(text: &str, config: &GameConfig) {
 }
 
 // Keep the old function for backwards compatibility
+#[cfg(not(target_arch = "wasm32"))]
 pub fn print_typewriter_effect(text: &str, config: &GameConfig) {
+    use std::io::{self, Write};
+    use std::thread;
+    use std::time::Duration;
     print_game_text(text, config);
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn get_user_input(config: &GameConfig) -> Result<String, io::Error> {
+    use std::io;
     use crate::config::UiMode;
     if config.ui_mode == UiMode::Centered {
         // Align with the choice margin
@@ -103,6 +120,7 @@ pub fn get_user_input(config: &GameConfig) -> Result<String, io::Error> {
     Ok(input.trim().to_string())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn get_content_margin() -> usize {
     if let Some((width, _)) = terminal_size::terminal_size() {
         let terminal_width = width.0 as usize;
@@ -113,6 +131,7 @@ fn get_content_margin() -> usize {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn display_choices(choices: &[&crate::world::Choice], config: &GameConfig) {
     for (i, choice) in choices.iter().enumerate() {
         let full_choice = format!("{}: {}", i + 1, choice.text);
@@ -120,6 +139,7 @@ pub fn display_choices(choices: &[&crate::world::Choice], config: &GameConfig) {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn parse_user_choice(input: &str, choices: &[&crate::world::Choice], config: &GameConfig) -> Option<usize> {
     let input = input.trim();
     

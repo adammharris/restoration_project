@@ -1,3 +1,4 @@
 /target
 restoration_config.json
 .DS_Store
+/dist

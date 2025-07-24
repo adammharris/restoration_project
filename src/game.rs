@@ -2,6 +2,7 @@ use std::collections::{HashSet, HashMap};
 use std::fs;
 use serde::{Serialize, Deserialize};
 use crate::world::{FlagId, Choice, Action, Condition, World, Room};
+#[cfg(not(target_arch = "wasm32"))]
 use crate::ui::print_typewriter_effect;
 use crate::errors::{GameError, GameResult};
 use crate::config::GameConfig;
@@ -87,6 +88,7 @@ pub fn execute_actions(choice: &Choice, game_state: &mut GameState, config: &Gam
             }
             Action::Quit => game_state.has_quit = true,
             Action::DisplayText(text) => {
+                #[cfg(not(target_arch = "wasm32"))]
                 print_typewriter_effect(&format!("\n{}", text), config);
             }
             Action::DisplayTextConditional { condition, text_if_true, text_if_false } => {
@@ -95,23 +97,27 @@ pub fn execute_actions(choice: &Choice, game_state: &mut GameState, config: &Gam
                 } else {
                     text_if_false
                 };
+                #[cfg(not(target_arch = "wasm32"))]
                 print_typewriter_effect(&format!("\n{}", text), config);
             }
             Action::IncrementCounter(counter) => {
                 let old_value = *game_state.counters.get(counter).unwrap_or(&0);
                 *game_state.counters.entry(counter.clone()).or_insert(0) += 1;
                 let new_value = *game_state.counters.get(counter).unwrap();
+                #[cfg(not(target_arch = "wasm32"))]
                 print_typewriter_effect(&format!("\n[{}: {} → {}]", counter, old_value, new_value), config);
             }
             Action::DecrementCounter(counter) => {
                 let old_value = *game_state.counters.get(counter).unwrap_or(&0);
                 *game_state.counters.entry(counter.clone()).or_insert(0) -= 1;
                 let new_value = *game_state.counters.get(counter).unwrap();
+                #[cfg(not(target_arch = "wasm32"))]
                 print_typewriter_effect(&format!("\n[{}: {} → {}]", counter, old_value, new_value), config);
             }
             Action::SetCounter(counter, value) => {
                 let old_value = *game_state.counters.get(counter).unwrap_or(&0);
                 game_state.counters.insert(counter.clone(), *value);
+                #[cfg(not(target_arch = "wasm32"))]
                 print_typewriter_effect(&format!("\n[{}: {} → {}]", counter, old_value, value), config);
             }
         }

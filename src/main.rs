@@ -4,15 +4,34 @@ mod ui;
 mod errors;
 mod config;
 mod markdown_parser;
+
+#[cfg(not(target_arch = "wasm32"))]
 mod terminal_ui;
 
-use clap::{Parser, Subcommand};
-use world::load_world_from_markdown;
-use game::{GameState, get_available_choices, execute_actions, get_room_description};
-use ui::{print_typewriter_effect, get_user_input, display_choices, parse_user_choice, print_game_text};
-use terminal_ui::TerminalUi;
-use config::{GameConfig, UiMode};
+#[cfg(target_arch = "wasm32")]
+mod web_ui;
 
+use game::GameState;
+use world::load_world_from_markdown_content;
+use config::GameConfig;
+
+#[cfg(not(target_arch = "wasm32"))]
+use {
+    clap::{Parser, Subcommand},
+    ui::{print_typewriter_effect, get_user_input, display_choices, parse_user_choice, print_game_text},
+    terminal_ui::TerminalUi,
+    world::load_world_from_markdown,
+    game::{get_available_choices, execute_actions},
+    config::UiMode,
+};
+
+#[cfg(target_arch = "wasm32")]
+use {
+    web_ui::run_web_game,
+    wasm_bindgen::prelude::*,
+};
+
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Parser)]
 #[command(name = "restoration")]
 #[command(about = "A text adventure game engine with Markdown story format")]
@@ -22,6 +41,7 @@ struct Cli {
     command: Option<Commands>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Subcommand)]
 enum Commands {
     /// Play a story (default command)
@@ -53,6 +73,7 @@ enum Commands {
     },
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Subcommand)]
 enum ConfigAction {
     /// Show current configuration
@@ -75,6 +96,7 @@ enum ConfigAction {
     DisableUiMode,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() {
     let cli = Cli::parse();
     
@@ -98,6 +120,42 @@ fn main() {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    wasm_main();
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(start)]
+pub fn wasm_main() {
+    console_error_panic_hook::set_once();
+    wasm_logger::init(wasm_logger::Config::default());
+    
+    // For web, we'll start with the default story
+    let story_content = include_str!("../first-vision.md");
+    play_story_web(story_content);
+}
+
+#[cfg(target_arch = "wasm32")]
+fn play_story_web(story_content: &str) {
+    let config = GameConfig::default();
+    
+    let world = match load_world_from_markdown_content(story_content) {
+        Ok(world) => world,
+        Err(e) => {
+            web_sys::console::error_1(&format!("Error loading story: {}", e).into());
+            return;
+        }
+    };
+
+    let game_state = GameState::new(world.starting_room_id.clone());
+    
+    // Start the web game using the new Ratzilla pattern
+    run_web_game(world, game_state, config);
+}
+
+
+#[cfg(not(target_arch = "wasm32"))]
 fn play_story(story_file: &str, fast: bool, no_text_commands: bool) {
     let mut config = match GameConfig::load_or_create() {
         Ok(config) => config,
@@ -129,6 +187,7 @@ fn play_story(story_file: &str, fast: bool, no_text_commands: bool) {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn play_story_plain(story_file: &str, world: world::World, config: GameConfig) {
     let save_filename = format!("{}.save", story_file.replace(".md", ""));
     
@@ -254,6 +313,7 @@ fn play_story_plain(story_file: &str, world: world::World, config: GameConfig) {
     print_game_text("\nThank you for playing!", &config);
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn play_story_terminal_ui(story_file: &str, world: world::World, config: GameConfig) {
     let mut terminal_ui = match TerminalUi::new(config.clone()) {
         Ok(ui) => ui,
@@ -391,6 +451,7 @@ fn play_story_terminal_ui(story_file: &str, world: world::World, config: GameCon
     let _ = terminal_ui.cleanup();
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn execute_actions_terminal_ui(choice: &world::Choice, game_state: &mut game::GameState, terminal_ui: &mut terminal_ui::TerminalUi) {
     use crate::world::Action;
     use crate::game::check_single_condition;
@@ -437,6 +498,7 @@ fn execute_actions_terminal_ui(choice: &world::Choice, game_state: &mut game::Ga
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn validate_story(story_file: &str) {
     match load_world_from_markdown(story_file) {
         Ok(_) => {
@@ -454,6 +516,7 @@ fn validate_story(story_file: &str) {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn handle_config(action: ConfigAction) {
     match action {
         ConfigAction::Show => {
