@@ -80,7 +80,7 @@ I decided that I must either remain in darkness and confusion, or else I must do
 - I look at father and open my mouth, but no words come out. I have no idea what to tell him.
 
 ### Go to bed [decided_where_to_pray]
-- @room night2
+- @night2
 
 ## @room night2
 I kneel beside my bed and pray earnestly, and it occurs to me for the first time that I have never prayed out loud before. I decided that tomorrow in the grove would be my first time. I was too shy to pray out loud where my brothers could hear me. At last we pull the covers up and sleep overtakes me.
