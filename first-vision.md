@@ -64,7 +64,32 @@ In process of time my mind became somewhat partial to the Methodist sect, and I 
 ### Read from the Bible
 - The verse in the Epistle of James, first chapter and fifth verse, keeps coming to mind. It reads: If any of you lack wisdom, let him ask of God, that giveth to all men liberally, and upbraideth not; and it shall be given him.
 - Never did any passage of scripture come with more power to the heart of man than this did at this time to mine. It seemed to enter with great force into every feeling of my heart. I reflected on it again and again, knowing that if any person needed wisdom from God, I did; for how to act I did not know, and unless I could get more wisdom than I then had, I would never know; for the teachers of religion of the different sects understood the same passages of scripture so differently as to destroy all confidence in settling the question by an appeal to the Bible.
-- end
+- @decision
+
+### Pray
+- As I pray, I feel the Holy Spirit. The verse from James keeps coming back to my mind.
+
+## @room decision
+I decided that I must either remain in darkness and confusion, or else I must do as James directs, that is, ask of God. I at length came to the determination to “ask of God,” concluding that if he gave wisdom to them that lacked wisdom, and would give liberally, and not upbraid, I might venture.
+
+### Look outside
+- The grove nearby my house is an excellent spot to pray. I decided that I would go there— tomorrow. It is getting late tonight. I had better get ready for bed.
+- flag+ decided_where_to_pray
+
+### Talk to Father
+- I look at father and open my mouth, but no words come out. I have no idea what to tell him.
+
+### Go to bed [decided_where_to_pray]
+- @room night2
+
+## @room night2
+I kneel beside my bed and pray earnestly, and it occurs to me for the first time that I have never prayed out loud before. I decided that tomorrow in the grove would be my first time. I was too shy to pray out loud where my brothers could hear me. At last we pull the covers up and sleep overtakes me.
+
+### Wake up
+- @sacred_grove
+
+## @room sacred_grove
+Unfortunately, this story has not been fully written yet!
 
 ### End
 - end
