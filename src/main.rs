@@ -1,6 +1,7 @@
 mod world;
 mod game;
 mod ui;
+mod ui_trait;
 mod errors;
 mod config;
 mod markdown_parser;
@@ -11,8 +12,7 @@ mod terminal_ui;
 #[cfg(target_arch = "wasm32")]
 mod web_ui;
 
-use game::GameState;
-use world::load_world_from_markdown_content;
+use game::{GameState, get_room_description};
 use config::GameConfig;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -28,6 +28,7 @@ use {
 #[cfg(target_arch = "wasm32")]
 use {
     web_ui::run_web_game,
+    world::load_world_from_markdown_content,
     wasm_bindgen::prelude::*,
 };
 
@@ -434,8 +435,10 @@ fn play_story_terminal_ui(story_file: &str, world: world::World, config: GameCon
         match parse_user_choice(&input, &available_choices, &config) {
             Some(choice_index) => {
                 let choice = available_choices[choice_index];
-                // Execute actions and capture any text output for terminal UI
-                execute_actions_terminal_ui(choice, &mut game_state, &mut terminal_ui);
+                // Use the new unified UI approach for proper text pacing
+                if let Err(e) = game::execute_choice(choice, &mut game_state, &mut terminal_ui, &config) {
+                    terminal_ui.display_text(&format!("Error executing choice: {}", e));
+                }
             }
             None => {
                 if config.allow_text_commands {
@@ -451,52 +454,6 @@ fn play_story_terminal_ui(story_file: &str, world: world::World, config: GameCon
     let _ = terminal_ui.cleanup();
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-fn execute_actions_terminal_ui(choice: &world::Choice, game_state: &mut game::GameState, terminal_ui: &mut terminal_ui::TerminalUi) {
-    use crate::world::Action;
-    use crate::game::check_single_condition;
-    
-    for action in &choice.actions {
-        match action {
-            Action::GoTo(room_id) => game_state.current_room_id = room_id.clone(),
-            Action::SetFlag(flag_id) => {
-                game_state.flags.insert(flag_id.clone());
-            }
-            Action::RemoveFlag(flag_id) => {
-                game_state.flags.remove(flag_id);
-            }
-            Action::Quit => game_state.has_quit = true,
-            Action::DisplayText(text) => {
-                terminal_ui.display_text(text);
-            }
-            Action::DisplayTextConditional { condition, text_if_true, text_if_false } => {
-                let text = if check_single_condition(condition, game_state) {
-                    text_if_true
-                } else {
-                    text_if_false
-                };
-                terminal_ui.display_text(text);
-            }
-            Action::IncrementCounter(counter) => {
-                let old_value = *game_state.counters.get(counter).unwrap_or(&0);
-                *game_state.counters.entry(counter.clone()).or_insert(0) += 1;
-                let new_value = *game_state.counters.get(counter).unwrap();
-                terminal_ui.display_text(&format!("[{}: {} → {}]", counter, old_value, new_value));
-            }
-            Action::DecrementCounter(counter) => {
-                let old_value = *game_state.counters.get(counter).unwrap_or(&0);
-                *game_state.counters.entry(counter.clone()).or_insert(0) -= 1;
-                let new_value = *game_state.counters.get(counter).unwrap();
-                terminal_ui.display_text(&format!("[{}: {} → {}]", counter, old_value, new_value));
-            }
-            Action::SetCounter(counter, value) => {
-                let old_value = *game_state.counters.get(counter).unwrap_or(&0);
-                game_state.counters.insert(counter.clone(), *value);
-                terminal_ui.display_text(&format!("[{}: {} → {}]", counter, old_value, value));
-            }
-        }
-    }
-}
 
 #[cfg(not(target_arch = "wasm32"))]
 fn validate_story(story_file: &str) {

@@ -14,6 +14,8 @@ use wasm_bindgen::JsCast;
 use crate::config::GameConfig;
 use crate::world::{Choice, World};
 use crate::game::{GameState, get_available_choices, get_room_description};
+use crate::ui_trait::{GameUI, WaitForInput};
+use std::error::Error;
 
 // Global reference to the app for typewriter timer callbacks
 static mut TYPEWRITER_APP: Option<Rc<App>> = None;
@@ -31,6 +33,11 @@ pub struct App {
     typewriter_complete: RefCell<bool>,     // Whether current typewriter effect is complete
     typewriter_current_line: RefCell<usize>, // Current line being typed
     typewriter_current_char: RefCell<usize>, // Current character position in line
+    pending_texts: RefCell<Vec<String>>,    // Texts waiting to be displayed with pauses
+    pending_text_index: RefCell<usize>,     // Current index in pending_texts
+    waiting_for_continue: RefCell<bool>,    // Whether we're waiting for user to continue
+    pending_room_change: RefCell<bool>,     // Whether there's a room change pending after text sequence
+    room_text_sequence: RefCell<bool>,      // Whether current text sequence is for room description
     config: GameConfig,
 }
 
@@ -49,6 +56,11 @@ impl App {
             typewriter_complete: RefCell::new(true),
             typewriter_current_line: RefCell::new(0),
             typewriter_current_char: RefCell::new(0),
+            pending_texts: RefCell::new(Vec::new()),
+            pending_text_index: RefCell::new(0),
+            waiting_for_continue: RefCell::new(false),
+            pending_room_change: RefCell::new(false),
+            room_text_sequence: RefCell::new(false),
             config,
         };
 
@@ -152,8 +164,8 @@ impl App {
             // Store the current room ID before executing actions
             let previous_room_id = self.game_state.borrow().current_room_id.clone();
             
-            // Prepare text to display
-            let mut new_text = vec![
+            // Prepare initial text to display
+            let initial_text = vec![
                 format!("> {}", choice.text),
                 "".to_string(),
             ];
@@ -161,15 +173,17 @@ impl App {
             // Enable auto-scroll when new content is added
             *self.auto_scroll.borrow_mut() = true;
             
-            // Execute the choice actions and collect any text output
+            // Execute the choice actions using the unified approach
             let mut game_state = self.game_state.borrow_mut();
-            let action_text = self.execute_actions_web(&choice, &mut game_state);
             let has_quit = game_state.has_quit;
-            let current_room_id = game_state.current_room_id.clone();
+            
+            // Use a simplified version of execute_choice for web that handles text sequencing
+            let action_texts = self.execute_actions_for_web(&choice, &mut game_state);
+            let current_room_id = game_state.current_room_id.clone(); // Get room ID AFTER actions
             drop(game_state);
             
-            // Add any text from actions to the new text
-            new_text.extend(action_text);
+            // Add initial text to display
+            self.all_text.borrow_mut().extend(initial_text);
             
             // Check if game has ended
             if has_quit {
@@ -179,33 +193,114 @@ impl App {
                 return;
             }
             
-            // Only display new room description if room actually changed
-            if previous_room_id != current_room_id {
-                let current_room = match self.world.rooms.get(&current_room_id) {
-                    Some(room) => room,
-                    None => {
-                        new_text.push(format!("Error: Room '{}' not found!", current_room_id));
-                        self.add_text_with_typewriter(new_text);
-                        return;
-                    }
-                };
-                
-                let game_state = self.game_state.borrow();
-                let room_desc = get_room_description(current_room, &game_state);
-                drop(game_state);
-                
-                new_text.push("".to_string());
-                new_text.push("─".repeat(60));
-                new_text.push("".to_string());
-                new_text.push(room_desc);
+            // Check if we have text actions
+            let has_text_actions = !action_texts.is_empty();
+            
+            // Start the text sequence if there are texts to display
+            if has_text_actions {
+                *self.room_text_sequence.borrow_mut() = false; // This is a choice action text sequence
+                self.start_text_sequence(action_texts);
             }
             
-            // Display all the new text with typewriter effect
-            self.add_text_with_typewriter(new_text);
-            
-            // Update choices (this will happen regardless of room change)
-            self.update_choices();
+            // Handle room change and choice updates
+            if previous_room_id != current_room_id {
+                *self.pending_room_change.borrow_mut() = true;
+                // If we're not in a text sequence, handle room change immediately
+                if !has_text_actions {
+                    self.handle_room_change(current_room_id);
+                    *self.pending_room_change.borrow_mut() = false;
+                } 
+                // If we have text actions, room change will be handled after text sequence completes
+            } else {
+                *self.pending_room_change.borrow_mut() = false;
+                // No room change, update choices if not in text sequence
+                if !has_text_actions {
+                    self.update_choices();
+                }
+            }
         }
+    }
+    
+    fn execute_actions_for_web(&self, choice: &Choice, game_state: &mut GameState) -> Vec<String> {
+        use crate::world::Action;
+        use crate::game::check_single_condition;
+        
+        let mut text_actions = Vec::new();
+        
+        // Execute immediate actions first
+        for action in &choice.actions {
+            match action {
+                Action::GoTo(room_id) => game_state.current_room_id = room_id.clone(),
+                Action::SetFlag(flag_id) => {
+                    game_state.flags.insert(flag_id.clone());
+                }
+                Action::RemoveFlag(flag_id) => {
+                    game_state.flags.remove(flag_id);
+                }
+                Action::Quit => game_state.has_quit = true,
+                Action::IncrementCounter(counter) => {
+                    let old_value = *game_state.counters.get(counter).unwrap_or(&0);
+                    *game_state.counters.entry(counter.clone()).or_insert(0) += 1;
+                    let new_value = *game_state.counters.get(counter).unwrap();
+                    text_actions.push(format!("[{}: {} → {}]", counter, old_value, new_value));
+                }
+                Action::DecrementCounter(counter) => {
+                    let old_value = *game_state.counters.get(counter).unwrap_or(&0);
+                    *game_state.counters.entry(counter.clone()).or_insert(0) -= 1;
+                    let new_value = *game_state.counters.get(counter).unwrap();
+                    text_actions.push(format!("[{}: {} → {}]", counter, old_value, new_value));
+                }
+                Action::SetCounter(counter, value) => {
+                    let old_value = *game_state.counters.get(counter).unwrap_or(&0);
+                    game_state.counters.insert(counter.clone(), *value);
+                    text_actions.push(format!("[{}: {} → {}]", counter, old_value, value));
+                }
+                Action::DisplayText(text) => {
+                    text_actions.push(text.clone());
+                }
+                Action::DisplayTextConditional { condition, text_if_true, text_if_false } => {
+                    let text = if check_single_condition(condition, game_state) {
+                        text_if_true.clone()
+                    } else {
+                        text_if_false.clone()
+                    };
+                    text_actions.push(text);
+                }
+            }
+        }
+        
+        text_actions
+    }
+    
+    fn handle_room_change(&self, room_id: String) {
+        let current_room = match self.world.rooms.get(&room_id) {
+            Some(room) => room,
+            None => {
+                self.all_text.borrow_mut().push(format!("Error: Room '{}' not found!", room_id));
+                return;
+            }
+        };
+        
+        let game_state = self.game_state.borrow();
+        let room_desc = get_room_description(current_room, &game_state);
+        drop(game_state);
+        
+        if room_desc.is_empty() {
+            // Skip empty room descriptions
+            return;
+        }
+        
+        // Add separator first (immediately, no typewriter)
+        let mut all_text = self.all_text.borrow_mut();
+        all_text.push("".to_string());
+        all_text.push("─".repeat(60));
+        all_text.push("".to_string());
+        drop(all_text);
+        
+        // Display room description with typewriter effect
+        let room_texts = vec![room_desc];
+        *self.room_text_sequence.borrow_mut() = true;
+        self.start_text_sequence(room_texts);
     }
 
     fn select_by_number(&self, number: usize) {
@@ -304,9 +399,25 @@ impl App {
 
     fn skip_typewriter(&self) {
         if self.config.enable_typewriter && !*self.typewriter_complete.borrow() {
-            // Complete the typewriter effect immediately
+            // Complete the typewriter effect immediately by finishing all remaining text
             let typewriter_text = self.typewriter_text.borrow().clone();
-            self.all_text.borrow_mut().extend(typewriter_text);
+            let current_line = *self.typewriter_current_line.borrow();
+            let mut all_text = self.all_text.borrow_mut();
+            
+            // Complete the current partial line if it exists
+            if current_line < typewriter_text.len() {
+                // If we're in the middle of typing a line, complete it
+                if let Some(last_line) = all_text.last_mut() {
+                    *last_line = typewriter_text[current_line].clone();
+                }
+                
+                // Add any remaining complete lines
+                for i in (current_line + 1)..typewriter_text.len() {
+                    all_text.push(typewriter_text[i].clone());
+                }
+            }
+            
+            drop(all_text);
             *self.typewriter_complete.borrow_mut() = true;
         }
     }
@@ -357,55 +468,83 @@ impl App {
         }
     }
 
-    fn execute_actions_web(&self, choice: &Choice, game_state: &mut GameState) -> Vec<String> {
-        use crate::world::Action;
-        use crate::game::check_single_condition;
-        
-        let mut text_output = Vec::new();
-        
-        for action in &choice.actions {
-            match action {
-                Action::GoTo(room_id) => game_state.current_room_id = room_id.clone(),
-                Action::SetFlag(flag_id) => {
-                    game_state.flags.insert(flag_id.clone());
-                }
-                Action::RemoveFlag(flag_id) => {
-                    game_state.flags.remove(flag_id);
-                }
-                Action::Quit => game_state.has_quit = true,
-                Action::DisplayText(text) => {
-                    text_output.push(text.clone());
-                }
-                Action::DisplayTextConditional { condition, text_if_true, text_if_false } => {
-                    let text = if check_single_condition(condition, game_state) {
-                        text_if_true
-                    } else {
-                        text_if_false
-                    };
-                    text_output.push(text.clone());
-                }
-                Action::IncrementCounter(counter) => {
-                    let old_value = *game_state.counters.get(counter).unwrap_or(&0);
-                    *game_state.counters.entry(counter.clone()).or_insert(0) += 1;
-                    let new_value = *game_state.counters.get(counter).unwrap();
-                    text_output.push(format!("[{}: {} → {}]", counter, old_value, new_value));
-                }
-                Action::DecrementCounter(counter) => {
-                    let old_value = *game_state.counters.get(counter).unwrap_or(&0);
-                    *game_state.counters.entry(counter.clone()).or_insert(0) -= 1;
-                    let new_value = *game_state.counters.get(counter).unwrap();
-                    text_output.push(format!("[{}: {} → {}]", counter, old_value, new_value));
-                }
-                Action::SetCounter(counter, value) => {
-                    let old_value = *game_state.counters.get(counter).unwrap_or(&0);
-                    game_state.counters.insert(counter.clone(), *value);
-                    text_output.push(format!("[{}: {} → {}]", counter, old_value, value));
-                }
-            }
+    fn start_text_sequence(&self, texts: Vec<String>) {
+        if texts.is_empty() {
+            return;
         }
         
-        text_output
+        *self.pending_texts.borrow_mut() = texts;
+        *self.pending_text_index.borrow_mut() = 0;
+        *self.waiting_for_continue.borrow_mut() = false;
+        // Note: room_text_sequence flag is set by the caller if needed
+        
+        // Start displaying the first text
+        self.display_next_pending_text();
     }
+    
+    fn display_next_pending_text(&self) {
+        let pending_texts = self.pending_texts.borrow();
+        let mut pending_index = self.pending_text_index.borrow_mut();
+        let total_texts = pending_texts.len();
+        
+        if *pending_index < total_texts {
+            let text = pending_texts[*pending_index].clone();
+            drop(pending_texts);
+            
+            // Display this text with typewriter effect
+            self.add_text_with_typewriter(vec![text]);
+            
+            *pending_index += 1;
+            
+            // Check if there are more texts to display
+            if *pending_index < total_texts {
+                // Set waiting state for continue prompt
+                *self.waiting_for_continue.borrow_mut() = true;
+            } else {
+                // Text sequence is complete
+                drop(pending_index); // Drop the borrow before calling complete_text_sequence
+                self.complete_text_sequence();
+            }
+        }
+    }
+    
+    fn complete_text_sequence(&self) {
+        // Clear the text sequence
+        self.pending_texts.borrow_mut().clear();
+        *self.pending_text_index.borrow_mut() = 0;
+        
+        // Check if this was a room text sequence
+        let was_room_sequence = *self.room_text_sequence.borrow();
+        *self.room_text_sequence.borrow_mut() = false;
+        
+        if was_room_sequence {
+            // Room description sequence complete, update choices
+            self.update_choices();
+        } else if *self.pending_room_change.borrow() {
+            // Handle any pending room change from choice actions
+            let game_state = self.game_state.borrow();
+            let current_room_id = game_state.current_room_id.clone();
+            drop(game_state);
+            
+            self.handle_room_change(current_room_id);
+            *self.pending_room_change.borrow_mut() = false;
+        } else {
+            // No room change, just update choices to reflect any state changes
+            self.update_choices();
+        }
+    }
+    
+    fn continue_text_sequence(&self) {
+        if *self.waiting_for_continue.borrow() {
+            *self.waiting_for_continue.borrow_mut() = false;
+            self.display_next_pending_text();
+        }
+    }
+    
+    fn is_waiting_for_continue(&self) -> bool {
+        *self.waiting_for_continue.borrow()
+    }
+    
 
     pub fn render(&self, f: &mut Frame) {
         let all_text = self.all_text.borrow();
@@ -529,8 +668,10 @@ impl App {
 
         f.render_widget(paragraph, content_area);
 
-        // Render choices if available
-        if !current_choices.is_empty() {
+        // Render choices if available, or prompts if waiting/typing
+        let waiting = self.is_waiting_for_continue();
+        let typewriter_active = !self.is_typewriter_complete();
+        if !current_choices.is_empty() && !waiting && !typewriter_active {
             let choices_area = main_layout[1];
             
             let choices_chunks = Layout::default()
@@ -563,7 +704,114 @@ impl App {
                 .style(Style::default().fg(Color::White));
 
             f.render_widget(choices_list, choices_content_area);
+        } else if waiting {
+            // Show continue prompt
+            let choices_area = main_layout[1];
+            
+            let continue_chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Percentage(5),   // Left margin
+                    Constraint::Percentage(90),  // Continue content
+                    Constraint::Percentage(5),   // Right margin
+                ])
+                .split(choices_area);
+
+            let continue_content_area = continue_chunks[1];
+
+            let continue_prompt = Paragraph::new("Press Enter to continue...")
+                .block(Block::default().borders(Borders::ALL))
+                .style(Style::default().fg(Color::Yellow));
+
+            f.render_widget(continue_prompt, continue_content_area);
+        } else if typewriter_active {
+            // Show skip typewriter prompt
+            let choices_area = main_layout[1];
+            
+            let skip_chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Percentage(5),   // Left margin
+                    Constraint::Percentage(90),  // Skip content
+                    Constraint::Percentage(5),   // Right margin
+                ])
+                .split(choices_area);
+
+            let skip_content_area = skip_chunks[1];
+
+            let skip_prompt = Paragraph::new("Press any key to skip...")
+                .block(Block::default().borders(Borders::ALL))
+                .style(Style::default().fg(Color::Cyan));
+
+            f.render_widget(skip_prompt, skip_content_area);
         }
+    }
+}
+
+impl GameUI for App {
+    fn display_texts(&mut self, texts: &[String]) -> Result<(), Box<dyn Error>> {
+        self.start_text_sequence(texts.to_vec());
+        Ok(())
+    }
+    
+    fn display_text(&mut self, text: &str) -> Result<(), Box<dyn Error>> {
+        self.all_text.borrow_mut().push(text.to_string());
+        Ok(())
+    }
+    
+    fn display_choices(&mut self, choices: &[&Choice]) {
+        let mut current_choices = self.current_choices.borrow_mut();
+        let mut available_choices = self.available_choices.borrow_mut();
+        
+        current_choices.clear();
+        available_choices.clear();
+        *self.selected_choice.borrow_mut() = 0;
+
+        if choices.is_empty() {
+            self.all_text.borrow_mut().push("There is nothing you can do here.".to_string());
+            self.all_text.borrow_mut().push("🎉 Game Over!".to_string());
+            return;
+        }
+
+        for (i, choice) in choices.iter().enumerate() {
+            let choice_text = format!("{}: {}", i + 1, choice.text);
+            current_choices.push(choice_text);
+            available_choices.push((*choice).clone());
+        }
+    }
+    
+    fn get_user_choice(&mut self) -> Result<usize, Box<dyn Error>> {
+        // This method doesn't make sense for the web UI since it's event-driven
+        // Instead, the web UI handles choices through the event system
+        // We'll return the currently selected choice
+        Ok(*self.selected_choice.borrow())
+    }
+    
+    fn clear_choices(&mut self) {
+        self.current_choices.borrow_mut().clear();
+        self.available_choices.borrow_mut().clear();
+        *self.selected_choice.borrow_mut() = 0;
+    }
+    
+    fn add_separator(&mut self) {
+        let mut all_text = self.all_text.borrow_mut();
+        all_text.push("".to_string());
+        all_text.push("─".repeat(60));
+        all_text.push("".to_string());
+    }
+    
+    fn cleanup(&mut self) -> Result<(), Box<dyn Error>> {
+        // No cleanup needed for web UI
+        Ok(())
+    }
+}
+
+impl WaitForInput for App {
+    fn wait_for_continue(&mut self) -> Result<(), Box<dyn Error>> {
+        // For web UI, we set the waiting state and return immediately
+        // The actual waiting happens through the event system
+        *self.waiting_for_continue.borrow_mut() = true;
+        Ok(())
     }
 }
 
@@ -607,7 +855,11 @@ pub fn run_web_game(world: World, game_state: GameState, config: GameConfig) {
             }
             KeyCode::Enter => {
                 if app_clone.is_typewriter_complete() {
-                    app_clone.select_choice();
+                    if app_clone.is_waiting_for_continue() {
+                        app_clone.continue_text_sequence();
+                    } else {
+                        app_clone.select_choice();
+                    }
                 } else {
                     app_clone.skip_typewriter();
                 }

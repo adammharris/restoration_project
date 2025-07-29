@@ -76,6 +76,96 @@ pub fn check_single_condition(condition: &Condition, game_state: &GameState) -> 
     }
 }
 
+/// Execute a choice using the unified UI trait approach.
+/// This handles both immediate actions (flags, counters, room changes) 
+/// and text display actions with proper user-controlled pacing.
+pub fn execute_choice<T: crate::ui_trait::GameUI + crate::ui_trait::WaitForInput>(
+    choice: &Choice, 
+    game_state: &mut GameState, 
+    ui: &mut T,
+    _config: &GameConfig
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Store the original room ID to detect room changes
+    let original_room_id = game_state.current_room_id.clone();
+    
+    // First, execute all immediate actions (flags, counters, room changes, quit)
+    let mut counter_messages = Vec::new();
+    let mut room_changed = false;
+    
+    for action in &choice.actions {
+        match action {
+            Action::GoTo(room_id) => {
+                game_state.current_room_id = room_id.clone();
+                room_changed = true;
+            }
+            Action::SetFlag(flag_id) => {
+                game_state.flags.insert(flag_id.clone());
+            }
+            Action::RemoveFlag(flag_id) => {
+                game_state.flags.remove(flag_id);
+            }
+            Action::Quit => game_state.has_quit = true,
+            Action::IncrementCounter(counter) => {
+                let old_value = *game_state.counters.get(counter).unwrap_or(&0);
+                *game_state.counters.entry(counter.clone()).or_insert(0) += 1;
+                let new_value = *game_state.counters.get(counter).unwrap();
+                counter_messages.push(format!("[{}: {} → {}]", counter, old_value, new_value));
+            }
+            Action::DecrementCounter(counter) => {
+                let old_value = *game_state.counters.get(counter).unwrap_or(&0);
+                *game_state.counters.entry(counter.clone()).or_insert(0) -= 1;
+                let new_value = *game_state.counters.get(counter).unwrap();
+                counter_messages.push(format!("[{}: {} → {}]", counter, old_value, new_value));
+            }
+            Action::SetCounter(counter, value) => {
+                let old_value = *game_state.counters.get(counter).unwrap_or(&0);
+                game_state.counters.insert(counter.clone(), *value);
+                counter_messages.push(format!("[{}: {} → {}]", counter, old_value, value));
+            }
+            // Text display actions are handled separately
+            Action::DisplayText(_) | Action::DisplayTextConditional { .. } => {}
+        }
+    }
+    
+    // Collect all text display actions
+    let mut text_actions = Vec::new();
+    
+    // Add any counter messages first
+    text_actions.extend(counter_messages);
+    
+    // Then add display text actions
+    for action in &choice.actions {
+        match action {
+            Action::DisplayText(text) => {
+                text_actions.push(text.clone());
+            }
+            Action::DisplayTextConditional { condition, text_if_true, text_if_false } => {
+                let text = if check_single_condition(condition, game_state) {
+                    text_if_true.clone()
+                } else {
+                    text_if_false.clone()
+                };
+                text_actions.push(text);
+            }
+            _ => {}
+        }
+    }
+    
+    // Display all texts with proper pacing using the UI trait
+    if !text_actions.is_empty() {
+        ui.display_texts(&text_actions)?;
+    }
+    
+    // If room changed, add a pause before continuing to the new room
+    if room_changed && original_room_id != game_state.current_room_id {
+        ui.wait_for_continue()?;
+        ui.add_separator();
+    }
+    
+    Ok(())
+}
+
+// Keep the old execute_actions function for backwards compatibility with existing code
 pub fn execute_actions(choice: &Choice, game_state: &mut GameState, config: &GameConfig) {
     for action in &choice.actions {
         match action {

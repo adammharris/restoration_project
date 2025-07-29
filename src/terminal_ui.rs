@@ -16,6 +16,8 @@ use std::time::Duration;
 
 use crate::config::GameConfig;
 use crate::world::Choice;
+use crate::ui_trait::{GameUI, WaitForInput};
+use std::error::Error;
 
 pub struct TerminalUi {
     terminal: Terminal<CrosstermBackend<io::Stdout>>,
@@ -270,6 +272,93 @@ impl TerminalUi {
         self.all_text.push("─".repeat(60));
         self.all_text.push("".to_string());
         self.scroll_to_bottom();
+    }
+}
+
+impl GameUI for TerminalUi {
+    fn display_texts(&mut self, texts: &[String]) -> Result<(), Box<dyn Error>> {
+        for (i, text) in texts.iter().enumerate() {
+            TerminalUi::display_text(self, text);
+            
+            // Wait for user input between texts (except for the last one)
+            if i < texts.len() - 1 {
+                self.wait_for_continue()?;
+            }
+        }
+        Ok(())
+    }
+    
+    fn display_text(&mut self, text: &str) -> Result<(), Box<dyn Error>> {
+        // Call the existing display_text method from TerminalUi
+        TerminalUi::display_text(self, text);
+        Ok(())
+    }
+    
+    fn display_choices(&mut self, choices: &[&Choice]) {
+        TerminalUi::display_choices(self, choices);
+    }
+    
+    fn get_user_choice(&mut self) -> Result<usize, Box<dyn Error>> {
+        let input = self.get_input()?;
+        
+        // Parse the input as a number (1-based) and convert to 0-based index
+        if let Ok(choice_num) = input.parse::<usize>() {
+            if choice_num > 0 && choice_num <= self.current_choices.len() {
+                return Ok(choice_num - 1);
+            }
+        }
+        
+        // If parsing failed, return error
+        Err("Invalid choice".into())
+    }
+    
+    fn clear_choices(&mut self) {
+        self.current_choices.clear();
+        self.selected_choice = 0;
+        self.choice_list_state.select(None);
+    }
+    
+    fn add_separator(&mut self) {
+        self.clear_text();
+    }
+    
+    fn cleanup(&mut self) -> Result<(), Box<dyn Error>> {
+        TerminalUi::cleanup(self)
+    }
+}
+
+impl WaitForInput for TerminalUi {
+    fn wait_for_continue(&mut self) -> Result<(), Box<dyn Error>> {
+        // Display "Press Enter to continue..." and wait for input
+        self.all_text.push("".to_string());
+        self.all_text.push("Press Enter to continue...".to_string());
+        self.scroll_to_bottom();
+        
+        // Draw the current state
+        self.draw()?;
+        
+        // Wait for any key press
+        loop {
+            if event::poll(Duration::from_millis(16))? {
+                let event = event::read()?;
+                if let Event::Key(key) = event {
+                    if key.kind == KeyEventKind::Press {
+                        // Any key press continues
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Remove the "Press Enter to continue..." message
+        if let Some(last) = self.all_text.last() {
+            if last == "Press Enter to continue..." {
+                self.all_text.pop();
+                self.all_text.pop(); // Also remove the empty line
+            }
+        }
+        
+        Ok(())
     }
 }
 

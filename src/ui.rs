@@ -121,6 +121,16 @@ pub fn get_user_input(config: &GameConfig) -> Result<String, io::Error> {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+pub fn wait_for_enter() {
+    use std::io::{self, Write};
+    print!("\nPress Enter to continue...");
+    io::stdout().flush().unwrap();
+    
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn get_content_margin() -> usize {
     if let Some((width, _)) = terminal_size::terminal_size() {
         let terminal_width = width.0 as usize;
