@@ -81,16 +81,8 @@ impl App {
 
         let room_desc = get_room_description(current_room, &game_state);
         let mut all_text = self.all_text.borrow_mut();
-        all_text.push("🏰 Welcome to the Restoration Project".to_string());
         all_text.push("".to_string());
         all_text.push(room_desc);
-        all_text.push("".to_string());
-        all_text.push("🎮 Instructions:".to_string());
-        all_text.push("• Use arrow keys ↑↓ to navigate choices".to_string());
-        all_text.push("• Press Enter to select a choice".to_string());
-        all_text.push("• Press number keys (1-9) for quick selection".to_string());
-        all_text.push("• Use PageUp/PageDown or j/k to scroll text".to_string());
-        all_text.push("• Press End or Spacebar to return to auto-scroll".to_string());
         all_text.push("".to_string());
 
         drop(all_text);
