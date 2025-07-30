@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, user-scalable=no"
+      content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover, maximum-scale=1.0, minimum-scale=1.0"
     />
     <link
       rel="stylesheet"
@@ -22,19 +22,386 @@
         align-items: center;
         align-content: center;
         background-color: #121212;
+        position: relative;
+        overflow: hidden;
       }
       pre {
         font-family: "Fira Code", monospace;
         font-size: 16px;
         margin: 0px;
       }
+
+      /* Mobile-specific improvements */
+      @media (max-width: 768px) {
+        html {
+          font-size: 14px;
+        }
+        
+        body {
+          height: 100vh;
+          height: 100dvh; /* Use dynamic viewport height on newer browsers */
+          overflow: hidden;
+          touch-action: pan-x pan-y;
+          overscroll-behavior: none;
+        }
+        
+        pre {
+          font-size: 14px;
+          line-height: 1.4;
+        }
+        
+        /* Ensure the Ratzilla terminal takes full viewport */
+        body > div {
+          width: 100% !important;
+          height: 100% !important;
+          max-width: 100% !important;
+          max-height: 100% !important;
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+        
+        /* Allow text to use full width, buttons will overlay */
+        body > div > div {
+          width: 100% !important;
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+        
+        /* Override any Ratzilla internal spacing */
+        body > div > div > * {
+          width: 100% !important;
+          max-width: 100% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          box-sizing: border-box !important;
+        }
+        
+        /* Specifically target terminal content containers */
+        pre, div[style*="width"], div[style*="padding"], div[style*="margin"] {
+          width: 100% !important;
+          max-width: 100% !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          box-sizing: border-box !important;
+        }
+        
+        /* Target any Ratzilla-generated containers */
+        [class*="ratzilla"], [id*="ratzilla"], 
+        [class*="terminal"], [id*="terminal"],
+        [class*="tui"], [id*="tui"] {
+          width: 100% !important;
+          max-width: 100% !important;
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+        
+        /* Remove any default terminal margins/padding */
+        body * {
+          max-width: 100vw !important;
+        }
+        
+        /* Center the Ratzilla content */
+        body > div {
+          display: flex !important;
+          flex-direction: column !important;
+          justify-content: center !important;
+          align-items: center !important;
+        }
+        
+        body > div > div {
+          text-align: center !important;
+        }
+        
+        /* Center text content specifically */
+        pre {
+          text-align: center !important;
+        }
+        
+        /* Fix text rendering issues */
+        * {
+          -webkit-text-size-adjust: 100%;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
+      }
+
+      /* Ultra-small screens (phones in portrait) */
+      @media (max-width: 480px) {
+        html {
+          font-size: 12px;
+        }
+        
+        pre {
+          font-size: 12px;
+          line-height: 1.3;
+        }
+      }
+
+      /* Landscape phones */
+      @media (max-height: 500px) and (orientation: landscape) {
+        html {
+          font-size: 11px;
+        }
+        
+        pre {
+          font-size: 11px;
+          line-height: 1.2;
+        }
+      }
+
+      /* Mobile touch buttons */
+      .mobile-controls {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 1000;
+      }
+
+      .touch-button {
+        position: absolute;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.7);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        font-size: 24px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: auto;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .touch-button:active {
+        background: rgba(255, 255, 255, 0.2);
+        transform: scale(0.95);
+      }
+
+      /* Up button - top right */
+      .btn-up {
+        top: max(20px, env(safe-area-inset-top, 20px));
+        right: max(20px, env(safe-area-inset-right, 20px));
+      }
+
+      .btn-up::before {
+        content: "▲";
+      }
+
+      /* Down button - middle right */
+      .btn-down {
+        top: 50%;
+        right: max(20px, env(safe-area-inset-right, 20px));
+        transform: translateY(-50%);
+      }
+
+      .btn-down::before {
+        content: "▼";
+      }
+
+      /* Enter button - bottom right */
+      .btn-enter {
+        bottom: max(20px, env(safe-area-inset-bottom, 20px));
+        right: max(20px, env(safe-area-inset-right, 20px));
+      }
+
+      .btn-enter::before {
+        content: "⏎";
+      }
+
+      /* Additional mobile button adjustments - only on touch devices */
+      @media (hover: none) and (pointer: coarse) {
+        .touch-button {
+          width: 45px;
+          height: 45px;
+          font-size: 18px;
+          background: rgba(0, 0, 0, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Reduce margins since buttons will overlay text */
+        .btn-up {
+          top: max(15px, env(safe-area-inset-top, 15px));
+          right: max(10px, env(safe-area-inset-right, 10px));
+        }
+        
+        .btn-down {
+          right: max(10px, env(safe-area-inset-right, 10px));
+        }
+        
+        .btn-enter {
+          bottom: max(15px, env(safe-area-inset-bottom, 15px));
+          right: max(10px, env(safe-area-inset-right, 10px));
+        }
+      }
+
+      /* Show mobile controls ONLY on touch devices */
+      @media (hover: none) and (pointer: coarse) {
+        .mobile-controls {
+          display: block;
+        }
+      }
+      
     </style>
   </head>
   <body>
+    <!-- Mobile touch controls overlay -->
+    <div class="mobile-controls">
+      <button class="touch-button btn-up" id="btn-up" aria-label="Navigate up"></button>
+      <button class="touch-button btn-down" id="btn-down" aria-label="Navigate down"></button>
+      <button class="touch-button btn-enter" id="btn-enter" aria-label="Select choice"></button>
+    </div>
+
     <link data-trunk rel="rust" data-bin="restoration" />
-    <script type="module">
-      import init from "./pkg/restoration.js";
-      init();
+    <script>
+      // Try to import as module, but don't fail if it doesn't work
+      let init;
+      try {
+        import("./pkg/restoration.js").then(module => {
+          init = module.default;
+        }).catch(error => {
+          // Silently handle module loading errors
+        });
+      } catch (error) {
+        // Silently handle dynamic import errors
+      }
+      
+      // Mobile touch button functionality
+      function simulateKeyPress(keyCode) {
+        // Create synthetic keyboard event with proper key mappings
+        const keyEvent = new KeyboardEvent('keydown', {
+          code: keyCode,
+          key: getKeyFromCode(keyCode),
+          keyCode: getKeyCodeNumber(keyCode),
+          which: getKeyCodeNumber(keyCode),
+          bubbles: true,
+          cancelable: true
+        });
+        
+        // Dispatch to document and window to ensure Ratzilla catches it
+        document.dispatchEvent(keyEvent);
+        window.dispatchEvent(keyEvent);
+      }
+      
+      function getKeyFromCode(code) {
+        switch(code) {
+          case 'ArrowUp': return 'ArrowUp';
+          case 'ArrowDown': return 'ArrowDown';
+          case 'Enter': return 'Enter';
+          default: return code;
+        }
+      }
+      
+      function getKeyCodeNumber(code) {
+        switch(code) {
+          case 'ArrowUp': return 38;
+          case 'ArrowDown': return 40;
+          case 'Enter': return 13;
+          default: return 0;
+        }
+      }
+      
+      // Set up touch button event listeners
+      function setupMobileControls() {
+        // Wait for buttons to exist
+        const checkButtons = () => {
+          const btnUp = document.getElementById('btn-up');
+          const btnDown = document.getElementById('btn-down');
+          const btnEnter = document.getElementById('btn-enter');
+          
+          if (!btnUp || !btnDown || !btnEnter) {
+            setTimeout(checkButtons, 100);
+            return;
+          }
+          
+          // Remove any existing event listeners to avoid duplicates
+          btnUp.replaceWith(btnUp.cloneNode(true));
+          btnDown.replaceWith(btnDown.cloneNode(true));  
+          btnEnter.replaceWith(btnEnter.cloneNode(true));
+          
+          // Get fresh references after cloning
+          const newBtnUp = document.getElementById('btn-up');
+          const newBtnDown = document.getElementById('btn-down');
+          const newBtnEnter = document.getElementById('btn-enter');
+          
+          // Up button
+          newBtnUp.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            simulateKeyPress('ArrowUp');
+          }, { passive: false });
+          
+          newBtnUp.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            simulateKeyPress('ArrowUp');
+          });
+          
+          // Down button
+          newBtnDown.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            simulateKeyPress('ArrowDown');
+          }, { passive: false });
+          
+          newBtnDown.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            simulateKeyPress('ArrowDown');
+          });
+          
+          // Enter button
+          newBtnEnter.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            simulateKeyPress('Enter');
+          }, { passive: false });
+          
+          newBtnEnter.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            simulateKeyPress('Enter');
+          });
+        };
+        
+        checkButtons();
+      }
+      
+      // Initialize the app and mobile controls
+      document.addEventListener('DOMContentLoaded', () => {
+        setupMobileControls();
+      });
+      
+      // Also try after a delay to ensure everything is ready
+      setTimeout(() => {
+        setupMobileControls();
+      }, 1000);
+      
+      // Try to initialize Ratzilla, but don't depend on it for mobile controls
+      setTimeout(() => {
+        if (typeof init === 'function') {
+          try {
+            init().then(() => {
+              setupMobileControls();
+            }).catch(error => {
+              setupMobileControls();
+            });
+          } catch (error) {
+            setupMobileControls();
+          }
+        } else {
+          setupMobileControls();
+        }
+      }, 2000);
     </script>
   </body>
 </html>
