@@ -84,7 +84,7 @@ Before I sleep, I pray beside my bed. I share my bed with Hyrum. I wish him good
 ### Tell her a story about Moses
 - Once upon a time, there was an Egyptian king named Pharaoh. He was an evil man and ruled over the Israelite people in wickedness. But then God raised up a man named Moses. Moses was saved from a slaughter and God made him into a mighty prophet.
 - Moses used the power that God gave him to afflict the Egyptians with plagues until they let his people go. But when the Israelites left, the Egyptians followed to take them back! Before long, they were stranded at the shore of the Red Sea.
-- So Moses did something that no one had ever seen before: he smote the surface of the water with the rod that God gave him, and the sea parted, like a wall of water on either side! The Israelites passed through safely, but the water collapsed on the Egyptian army, destorying them. So Moses was able to save the people of Israel by the gift and power of God.
+- So Moses did something that no one had ever seen before: he smote the surface of the water with the rod that God gave him, and the sea parted, like a wall of water on either side! The Israelites passed through safely, but the water collapsed on the Egyptian army, destroying them. So Moses was able to save the people of Israel by the gift and power of God.
 - Katharine says, "Thank you Joseph for that story. Do you think one day there will be a prophet like Moses again?"
 - I think about that. "God could raise another one if he needed to. Now, off to bed Katharine. Goodnight."
 - She says, "Goodnight, Joseph."
