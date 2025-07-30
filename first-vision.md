@@ -46,7 +46,7 @@ After a hard day of work, it is nice to be inside. The daylight grows dim, and w
 - Sophronia says, "I think Father could preach at his own church if he wanted to. He knows more of the scriptures than anybody!"
 
 ### Talk to my younger brother Samuel
-- Samuel says, "
+- Samuel says, "I get bored from scripture study sometimes, but I know it is important."
 
 ### Talk to my little brother William
 - William says, "Hey Joseph, I've been practicing! I bet I could beat you at the stick game! Oh, yeah, I'm listening to father!"
@@ -56,7 +56,7 @@ After a hard day of work, it is nice to be inside. The daylight grows dim, and w
 - flag+ talked_to_katharine
 
 ### Play with my baby brother Don Carlos
-- 
+- Don Carlos is only four years old. I rub his head, and he giggles and grabs my leg.
 
 ### Listen to Father
 - Father says, "Here in the Book of James, we find a wonderful scripture: James chapter one verse five says: 'If any of you lack wisdom, let him ask of God.'" It is my testimony that our loving Father in Heaven always listens to our prayers.
@@ -103,6 +103,7 @@ Before I sleep, I pray beside my bed. I share my bed with Hyrum. I wish him good
 - She giggles gently. "Goodnight, Joseph."
 - "Goodnight, Katharine."
 - flag+ told_katharine_story
+- flag+ told_indian_story
 - @bed
 
 ### Tell her a story about a king and a queen
@@ -186,10 +187,128 @@ I decided that I must either remain in darkness and confusion, or else I must do
 I kneel beside my bed and pray earnestly, and it occurs to me for the first time that I have never prayed out loud before. I decided that tomorrow in the grove would be my first time. I was too shy to pray out loud where my brothers could hear me. At last we pull the covers up and sleep overtakes me.
 
 ### Wake up
-- @sacred_grove
+- @wake_up2
 
-## @room sacred_grove
+## @room wake_up2
 I wake up in the morning very early, before the rest of my family has really become active. It was a clear and beautiful spring day. It hadn't rained enough recently to form pools of mud. With any luck, no one in my family would even notice I had gone. 
 
-### End
+### Leave for the grove [told_indian_story]
+- @katharine_confrontation
+
+### Leave for the grove [talked_to_alvin & !told_indian_story]
+- @alvin_confrontation
+
+### Leave for the grove [!talked_to_alvin & !told_indian_story]
+- @grove
+
+## @room katharine_confrontation
+I head to the door, and I'm surprised to see Katharine there.
+
+### Talk to Katharine
+- "Hey Joseph," says Katharine.
+- "Hey Katharine," I say. "What are you doing up?"
+- "Well, I was thinking about the Indian story you told me last night. And then I dreamed about it. And I woke up early and felt like you were going to do something important today."
+- I am not sure what to say to her. Either she has marvelous intuition, or God had given her some kind of hint.
+- "I just want to say, good luck! I'll pray for you, okay?"
+- "Thanks, Katharine," I say. "I really appreciate it. And I am doing something important. I'll tell you about it later, okay?"
+- "Okay," says Katharine. "I'll leave you to it!"
+- I smile at her and exit the house, closing the door behind me. It felt really good to have someone's support.
+- @grove
+
+
+## @room alvin_confrontation
+I head to the door, and I'm surprised to see Alvin there.
+
+### Talk to Alvin
+- "Hey, Joseph," says Alvin. He shoots me a wry smile. He looks a little pale.
+- "Are you okay, Alvin?"
+- Alvin's smile flattens, and his eyes crinkle a bit. "I'm alright. I was praying really hard last night. I know that you know about my struggles with church and things like that. Well, I woke up early still thinking about it and still couldn't get back to sleep. So here I am."
+- I wonder about Alvin's health. I wish there was some way I could help him.
+- "Hey Joseph," Alvin says, "Where are you going?"
+- I hesitate, feeling quite shy about my mission to go pray.
+- "Well, whatever it is you are doing, do it well, eh?" Alvin smiles again. "I'll be alright. You go."
+- I smile back, feeling a little worried for Alvin but grateful he was letting me go.
+- @grove
+
+## @room grove
+[told_indian_story]
+I walk down the path, entering into the woods. I know where I am going. The path stops abruptly, but I continue into the woods. A few weeks ago we went logging not too far from here. I remembered leaving an axe in a stump— I decided that would be my checkpoint. I half-wonder if the very forest itself knew what I was doing, after reflecting on Katharine's words, but the grove appeared to be totally indifferent. Nevertheless, the sunlight coming down through the leaves was nothing short of majestic.
+
+[!told_indian_story]
+I walk down the path, entering into the woods. I know where I am going. The path stops abruptly, but I continue into the woods. A few weeks ago we went logging not too far from here. I remembered leaving an axe in a stump— I decided that would be my checkpoint. The sunlight coming down through the leaves was nothing short of majestic.
+
+### Kneel down
+- I decide that now is as good of a time as any. I fall to my knees, and suddenly the weight of my question hits me. How could I wend my way through all this confusion? How can I really know that I am forgiven of my sins? I remember my determination to pray out loud. Now is the time.
+- @temptation
+
+### Check axe
+- The axe looks like it is starting to get a bit rusty, unfortunately. I decide to leave it in the stump for now— I'll take it out when I'm done. Hopefully I won't forget it again.
+- flag+ remember_axe
+
+### Reflect on the desire of my heart [talked_to_alvin]
+- I want to know which church to join. There are so many churches, and none of them seem to agree. Even my older brother Alvin seemed troubled by all the confusion. He always seemed invincible to me. If there is a chance I can find an answer through prayer, it is worth trying.
+
+### Reflect on the desire of my heart [!talked_to_alvin]
+- I want to know which church to join. There are so many churches, and none of them seem to agree. If there is a chance I can find an answer through prayer, it is worth trying.
+
+## @room temptation
+Information is what I most desire at this time, and with a fixed determination to obtain it, I call upon the Lord for the first time. But my attempt to pray was fruitless— my tongue seemed to be swollen in my mouth, so that I could not utter.
+
+### Try to breathe
+- @fear
+
+### Try to speak
+- @fear
+
+## @room fear
+I hear a noise behind me, like some person walking towards me. I try again to pray but I can't. The noise of walking seems to draw nearer. I spring up on my feet and look around, but I can't see any person or thing that could produce the noise of walking.
+
+### Kneel down again
+- @attack
+
+## @room attack
+As soon as I knelt again, I was seized upon by some power which entirely overcame me, and had such an astonishing influence over me as to bind my tongue so that I could not speak. Thick darkness gathered around me, and it seemed to me for a time as if I were doomed to sudden destruction.
+
+### Cry out to God
+- Finally, words come out. It came out almost as a scream: "Oh Lord, my God!"
+- Suddenly, as soon as I was attacked, I was delivered from the enemy which had had me bound. I see a bright light— a glorious light— a pillar of light that is brighter than the sun at noon-day.
+- It seems to fall upon me and rest on my head— and then completely envelop me. It seems like the whole forest is on fire, but I don't feel alarmed. I feel love and peace in my heart. Above me I see countless angels singing and raising their voices to God.
+- @vision
+
+## @room vision
+The heavens seem to open, and the light somehow grows brighter. Out of the light, I see two people whose brightness and glory defy all description. I want to weep and praise them like all the other angels, but I can't do anything but be still in this magnificent light. The one on the right speaks to me: "Joseph, this is my Beloved Son. Hear Him!"
+
+### Hear Him
+- "Joseph, my son, thy sins are forgiven thee. Go thy way, walk in my statutes, and keep my commandments. Behold, I am the Lord of glory. I was crucified for the world, that all those who believe on my name may have eternal life."
+- My heart is filled with unspeakable joy. I know, now and forever, that this is truly the Christ. I managed to exercise courage and finally ask my question: "Lord, which church shall I join?"
+- "Behold, the world lieth in sin at this time, and none doeth good, no, not one. They have turned aside from the gospel and keep not my commandments. They draw near to me with their lips while their hearts are far from me. And mine anger is kindling against the inhabitants of the earth, to visit them according to their ungodliness and to bring to pass that which hath been spoken by the mouth of the prophets and apostles."
+- "Therefore, thou must go not after them. But in mine own due time, thou shalt receive a fulness of my gospel. Behold and lo, I come quickly, as it is written of me, in the cloud, clothed in the glory of my Father."
+- @ground
+
+## @room ground
+He tells me many things concerning the future of the kingdom— I could never write it all. The vision finally closes and I find myself lying on my back, looking up into heaven. When the light had departed, I had no strength. But I recover soon enough and decide to head home.
+
+### Head home
+- @go_home
+
+### Grab axe [remember_axe & !have_axe]
+- I had nearly forgotten the thing. It doesn't seem anywhere near as important as it did before, but I decided to take it anyway.
+- flag+ have_axe
+
+## @room go_home
+[talked_to_alvin | told_indian_story]
+As I am walking home, I see mother at the gates. "Oh Joseph!" she exclaims, "Are you alright? You look so pale!"
+
+[!talked_to_alvin & !told_indian_story]
+As I am walking home, I see the house, as quiet as ever. The trees are still magnificent and indifferent. I am still marveling at the majesty of the vision.
+
+### Speak with mother [talked_to_alvin | told_indian_story]
+- "Let us get you to the fireplace. Here, come inside," she says. I oblige.
+- As I am leaning against the fireplace, she asks, "Joseph, what happened? What is the matter with you?"
+- I reply, “Never mind, all is well—I am well enough off. I have learned for myself that Presbyterianism is not true.”
+- end
+
+### Head inside [!talked_to_alvin & !told_indian_story]
+- I head inside and lean against the fireplace. Mother is in the room, and she looks over at me. "Joseph, are you all right? What is the matter?"
+- I reply, “Never mind, all is well—I am well enough off. I have learned for myself that Presbyterianism is not true.”
 - end

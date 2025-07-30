@@ -253,11 +253,7 @@ fn parse_action_line(line: &str) -> Option<String> {
 fn parse_action(action_str: &str) -> GameResult<Action> {
     let action_str = action_str.trim();
     
-    // Display text: "text" or say: text
-    if action_str.starts_with('"') && action_str.ends_with('"') {
-        return Ok(Action::DisplayText(action_str[1..action_str.len()-1].to_string()));
-    }
-    
+    // Display text with say: prefix
     if action_str.starts_with("say: ") {
         return Ok(Action::DisplayText(action_str[5..].to_string()));
     }
